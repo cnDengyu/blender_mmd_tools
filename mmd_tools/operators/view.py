@@ -20,7 +20,7 @@ class SetGLSLShading(Operator):
             bpy.ops.object.lamp_add(type='HEMI', view_align=False, location=(0, 0, 0), rotation=(0, 0, 0))
             light = context.selected_objects[0]
             light.is_mmd_glsl_light = True
-            light.hide = True
+            light.hide_set(True)
 
         context.area.spaces[0].viewport_shade='TEXTURED'
         bpy.context.scene.game_settings.material_mode = 'GLSL'

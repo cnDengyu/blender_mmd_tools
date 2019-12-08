@@ -28,43 +28,43 @@ class __SelectObjects:
             pass
 
         for i in bpy.context.selected_objects:
-            i.select = False
+            i.select_set(False)
 
         self.__active_object = active_object
         self.__selected_objects = [active_object]+selected_objects
 
         self.__hides = []
         for i in self.__selected_objects:
-            self.__hides.append(i.hide)
-            i.hide = False
-            i.select = True
-        bpy.context.scene.objects.active = active_object
+            self.__hides.append(i.hide_get())
+            i.hide_set(False)
+            i.select_set(True)
+        bpy.context.view_layer.objects.active = active_object
 
     def __enter__(self):
         return self.__active_object
 
     def __exit__(self, type, value, traceback):
         for i, j in zip(self.__selected_objects, self.__hides):
-            i.hide = j
+            i.hide_set(j)
 
 def setParent(obj, parent):
-    ho = obj.hide
-    hp = parent.hide
-    obj.hide = False
-    parent.hide = False
+    ho = obj.hide_get()
+    hp = parent.hide_get()
+    obj.hide_set(False)
+    parent.hide_set(False)
     select_object(parent)
-    obj.select = True
+    obj.select_set(True)
     bpy.ops.object.parent_set(type='OBJECT', xmirror=False, keep_transform=False)
-    obj.hide = ho
-    parent.hide = hp
+    obj.hide_set(ho)
+    parent.hide_set(hp)
 
 def setParentToBone(obj, parent, bone_name):
     import bpy
     select_object(parent)
     bpy.ops.object.mode_set(mode='POSE')
     select_object(obj)
-    bpy.context.scene.objects.active = parent
-    parent.select = True
+    bpy.context.view_layer.objects.active = parent
+    parent.select_set(True)
     bpy.ops.object.mode_set(mode='POSE')
     parent.data.bones.active = parent.data.bones[bone_name]
     bpy.ops.object.parent_set(type='BONE', xmirror=False, keep_transform=False)
@@ -140,5 +140,5 @@ def makeCapsule(segment=16, ring_count=8, radius=1.0, height=1.0, target_scene=N
     faces.append([offset-1, offset, offset-segment])
 
     mesh.from_pydata(vertices, [], faces)
-    target_scene.objects.link(meshObj)
+    target_scene.collection.objects.link(meshObj)
     return meshObj

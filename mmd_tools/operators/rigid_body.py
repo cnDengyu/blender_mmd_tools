@@ -77,16 +77,16 @@ class AddRigidBody(Operator):
                 bone = bone,
                 )
         if mmd_root.show_rigid_bodies:
-            rigid.hide = False
+            rigid.hide_set(False)
             utils.selectAObject(rigid)
         else:
-            rigid.hide = True
+            rigid.hide_set(True)
             utils.selectAObject(obj)
             
-        if 'mmd_tools.'+mmd_root.name+'_all' in bpy.data.groups.keys(): # Add Rigid to allObjectsGroup
-            bpy.data.groups['mmd_tools.'+mmd_root.name+'_all'].objects.link(rigid)
-        if 'mmd_tools.'+mmd_root.name+'_rigids' in bpy.data.groups.keys(): # Add Rigid to RigidsGroup
-            bpy.data.groups['mmd_tools.'+mmd_root.name+'_rigids'].objects.link(rigid)
+        if 'mmd_tools.'+mmd_root.name+'_all' in bpy.data.collections.keys(): # Add Rigid to allObjectsGroup
+            bpy.data.collections['mmd_tools.'+mmd_root.name+'_all'].objects.link(rigid)
+        if 'mmd_tools.'+mmd_root.name+'_rigids' in bpy.data.collections.keys(): # Add Rigid to RigidsGroup
+            bpy.data.collections['mmd_tools.'+mmd_root.name+'_rigids'].objects.link(rigid)
             
         return { 'FINISHED' }
         
@@ -135,16 +135,16 @@ class AddJoint(Operator):
                 spring_angular = [0, 0, 0],
                 )
         if mmd_root.show_joints:
-            joint.hide = False
+            joint.hide_set(False)
             utils.selectAObject(joint)
         else:
-            joint.hide = True
+            joint.hide_set(True)
             utils.selectAObject(obj)
             
-        if 'mmd_tools.'+mmd_root.name+'_all' in bpy.data.groups.keys(): # Add Joint to allGroup
-            bpy.data.groups['mmd_tools.'+mmd_root.name+'_all'].link(joint)
-        if 'mmd_tools.'+mmd_root.name+'_joints' in bpy.data.groups.keys(): # Add Joint to joints group
-            bpy.data.groups['mmd_tools.'+mmd_root.name+'_joints'].link(joint)
+        if 'mmd_tools.'+mmd_root.name+'_all' in bpy.data.collections.keys(): # Add Joint to allGroup
+            bpy.data.collections['mmd_tools.'+mmd_root.name+'_all'].link(joint)
+        if 'mmd_tools.'+mmd_root.name+'_joints' in bpy.data.collections.keys(): # Add Joint to joints group
+            bpy.data.collections['mmd_tools.'+mmd_root.name+'_joints'].link(joint)
         return { 'FINISHED' }
     
 class RemoveJoint(Operator):

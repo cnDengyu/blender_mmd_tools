@@ -82,8 +82,8 @@ class Model:
         armObj = bpy.data.objects.new(name=name+'_arm', object_data=arm)
         armObj.parent = root
 
-        scene.objects.link(root)
-        scene.objects.link(armObj)
+        scene.collection.objects.link(root)
+        scene.collection.objects.link(armObj)
 
         return Model(root)
 
@@ -132,8 +132,7 @@ class Model:
             bpy.ops.mesh.primitive_uv_sphere_add(
                 segments=16,
                 ring_count=8,
-                size=1,
-                view_align=False,
+                radius=1,
                 enter_editmode=False
                 )
             size = mathutils.Vector([1,1,1]) * size[0]
@@ -141,7 +140,6 @@ class Model:
             bpy.ops.object.shade_smooth()
         elif shape_type == rigid_body.SHAPE_BOX:
             bpy.ops.mesh.primitive_cube_add(
-                view_align=False,
                 enter_editmode=False
                 )
             size = mathutils.Vector(size)
@@ -166,7 +164,7 @@ class Model:
 
         obj.mmd_rigid.shape = rigid_type
         obj.mmd_rigid.type = str(dynamics_type)
-        obj.draw_type = 'WIRE'
+        obj.display_type = 'WIRE'
         obj.show_wire = True
 
         with bpyutils.select_object(obj):
@@ -175,7 +173,7 @@ class Model:
         if collision_group_number is not None:
             obj.data.materials.append(RigidBodyMaterial.getMaterial(collision_group_number))
             obj.mmd_rigid.collision_group_number = collision_group_number
-            obj.draw_type = 'SOLID'
+            obj.display_type = 'SOLID'
             obj.show_transparent = True
         if collision_group_mask is not None:
             obj.mmd_rigid.collision_group_mask = collision_group_mask
@@ -206,7 +204,7 @@ class Model:
         constraint.mute = True
 
         obj.parent = self.rigidGroupObject()
-        obj.select = False
+        obj.select_set(False)
         self.__root.mmd_root.is_built = False
         return obj
 
@@ -245,7 +243,7 @@ class Model:
         obj = bpy.data.objects.new(
             'J.'+name,
             None)
-        bpy.context.scene.objects.link(obj)
+        bpy.context.scene.collection.objects.link(obj)
         obj.mmd_type = 'JOINT'
         obj.mmd_joint.name_j = name
         if name_e is not None:
@@ -253,8 +251,8 @@ class Model:
 
         obj.location = location
         obj.rotation_euler = rotation
-        obj.empty_draw_size = size
-        obj.empty_draw_type = 'ARROWS'
+        obj.empty_display_size = size
+        obj.empty_display_type = 'ARROWS'
         obj.hide_render = True
         obj.parent = self.armature()
 
@@ -296,7 +294,7 @@ class Model:
         obj.mmd_joint.spring_angular = spring_angular
 
         obj.parent = self.jointGroupObject()
-        obj.select = False
+        obj.select_set(False)
         self.__root.mmd_root.is_built = False
         return obj
 
@@ -371,7 +369,7 @@ class Model:
                 rigids = bpy.data.objects.new(name='rigidbodies', object_data=None)
                 rigids.mmd_type = 'RIGID_GRP_OBJ'
                 rigids.parent = self.__root
-                bpy.context.scene.objects.link(rigids)
+                bpy.context.scene.collection.objects.link(rigids)
                 self.__rigid_grp = rigids
         return self.__rigid_grp
         
@@ -384,7 +382,7 @@ class Model:
                 joints = bpy.data.objects.new(name='joints', object_data=None)
                 joints.mmd_type = 'JOINT_GRP_OBJ'
                 joints.parent = self.__root
-                bpy.context.scene.objects.link(joints)
+                bpy.context.scene.collection.objects.link(joints)
                 self.__joint_grp = joints
         return self.__joint_grp
         
@@ -397,7 +395,7 @@ class Model:
                 temporarys = bpy.data.objects.new(name='temporary', object_data=None)
                 temporarys.mmd_type = 'TEMPORARY_GRP_OBJ'
                 temporarys.parent = self.__root
-                bpy.context.scene.objects.link(temporarys)
+                bpy.context.scene.collection.objects.link(temporarys)
                 self.__temporary_grp = temporarys
         return self.__temporary_grp
 
@@ -504,20 +502,20 @@ class Model:
             empty = bpy.data.objects.new(
                 'mmd_bonetrack',
                 None)
-            bpy.context.scene.objects.link(empty)
+            bpy.context.scene.collection.objects.link(empty)
             empty.location = target_bone.tail
-            empty.empty_draw_size = 0.1
-            empty.empty_draw_type = 'ARROWS'
+            empty.empty_display_size = 0.1
+            empty.empty_display_type = 'ARROWS'
             empty.mmd_type = 'TRACK_TARGET'
-            empty.hide = True
+            empty.hide_set(True)
             empty.parent = self.temporaryGroupObject()
 
             rigid_obj.mmd_rigid.bone = relation.subtarget
             rigid_obj.constraints.remove(relation)
 
             bpyutils.setParent(empty, rigid_obj)
-            empty.select = False
-            empty.hide = True
+            empty.select_set(False)
+            empty.hide_set(True)
 
             for i in target_bone.constraints:
                 if i.type == 'IK':
@@ -526,10 +524,10 @@ class Model:
             const.name='mmd_tools_rigid_track'
             const.target = empty
 
-        t=rigid_obj.hide
+        t=rigid_obj.hide_get()
         with bpyutils.select_object(rigid_obj):
             bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-        rigid_obj.hide = t
+        rigid_obj.hide_set(t)
 
         rigid_obj.rigid_body.collision_shape = rigid.shape
 
@@ -546,10 +544,10 @@ class Model:
         logging.debug(' creating ncc, counts: %d', total_len)
                         
         ncc_obj = bpy.data.objects.new('ncc', None)
-        bpy.context.scene.objects.link(ncc_obj)
+        bpy.context.scene.collection.objects.link(ncc_obj)
         ncc_obj.location = [0, 0, 0]
-        ncc_obj.empty_draw_size = 0.5
-        ncc_obj.empty_draw_type = 'ARROWS'
+        ncc_obj.empty_display_size = 0.5
+        ncc_obj.empty_display_type = 'ARROWS'
         ncc_obj.mmd_type = 'NON_COLLISION_CONSTRAINT'
         ncc_obj.hide_render = True
         ncc_obj.parent = self.temporaryGroupObject()
@@ -567,10 +565,10 @@ class Model:
             if remain < 0:
                 last_selected = bpy.context.selected_objects
                 for i in range(-remain):
-                    last_selected[i].select = False
+                    last_selected[i].select_set(False)
             else:
                 for i in range(min(remain, len(last_selected))):
-                    last_selected[i].select = True
+                    last_selected[i].select_set(True)
             last_selected = bpy.context.selected_objects
         logging.debug(' created %d ncc.', len(ncc_objs))
 
@@ -630,7 +628,7 @@ class Model:
     def __makeSpring(self, target, base_obj, spring_stiffness):
         with bpyutils.select_object(target):
             bpy.ops.object.duplicate()
-            spring_target = bpy.context.scene.objects.active
+            spring_target = bpy.context.view_layer.objects.active
         t = spring_target.constraints.get('mmd_tools_rigid_parent')
         if t is not None:
             spring_target.constraints.remove(t)
@@ -639,18 +637,18 @@ class Model:
         spring_target.rigid_body.collision_groups = (False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, True)
         spring_target.parent = base_obj
         spring_target.matrix_parent_inverse = mathutils.Matrix(base_obj.matrix_basis).inverted()
-        spring_target.hide = True
+        spring_target.hide_set(True)
 
         obj = bpy.data.objects.new(
             'S.'+target.name,
             None)
-        bpy.context.scene.objects.link(obj)
+        bpy.context.scene.collection.objects.link(obj)
         obj.location = target.location
-        obj.empty_draw_size = 0.1
-        obj.empty_draw_type = 'ARROWS'
+        obj.empty_display_size = 0.1
+        obj.empty_display_type = 'ARROWS'
         obj.hide_render = True
-        obj.select = False
-        obj.hide = True
+        obj.select_set(False)
+        obj.hide_set(True)
         obj.mmd_type = 'SPRING_CONSTRAINT'
         obj.parent = self.temporaryGroupObject()
 
@@ -714,12 +712,11 @@ class RigidBodyMaterial:
         if material_name not in bpy.data.materials:
             mat = bpy.data.materials.new(material_name)
             color = cls.COLORS[number]
-            mat.diffuse_color = [((0xff0000 & color) >> 16) / float(255), ((0x00ff00 & color) >> 8) / float(255), (0x0000ff & color) / float(255)]
-            mat.diffuse_intensity = 1
+            mat.diffuse_color = [((0xff0000 & color) >> 16) / float(255), ((0x00ff00 & color) >> 8) / float(255), (0x0000ff & color) / float(255),1]
             mat.specular_intensity = 0
-            mat.alpha = 0.5
-            mat.use_transparency = True
-            mat.use_shadeless = True
+            #mat.alpha = 0.5
+            #mat.use_transparency = True
+            #mat.use_shadeless = True
         else:
             mat = bpy.data.materials[material_name]
         return mat

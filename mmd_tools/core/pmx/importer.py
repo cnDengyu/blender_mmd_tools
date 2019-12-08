@@ -10,6 +10,7 @@ import mathutils
 
 import mmd_tools.core.model as mmd_model
 import mmd_tools.core.pmx as pmx
+#import mmd_tools.cycles_converter as CyCon
 from mmd_tools.core.material import FnMaterial
 from mmd_tools import utils
 from mmd_tools import bpyutils
@@ -76,23 +77,23 @@ class PMXImporter:
 
         mesh = bpy.data.meshes.new(name=pmxModel.name)
         self.__meshObj = bpy.data.objects.new(name=pmxModel.name+'_mesh', object_data=mesh)
-        self.__targetScene.objects.link(self.__meshObj)
+        self.__targetScene.collection.objects.link(self.__meshObj)
 
         self.__armObj = self.__rig.armature()
-        self.__armObj.hide = True
+        self.__armObj.hide_set(True)
         self.__meshObj.parent = self.__armObj
 
     def __createGroups(self):
         pmxModel = self.__model
-        self.__mainObjGroup = bpy.data.groups.new(name='mmd_tools.' + pmxModel.name)
+        self.__mainObjGroup = bpy.data.collections.new(name='mmd_tools.' + pmxModel.name)
         logging.debug('Create main group: %s', self.__mainObjGroup.name)
-        self.__allObjGroup = bpy.data.groups.new(name='mmd_tools.' + pmxModel.name + '_all')
+        self.__allObjGroup = bpy.data.collections.new(name='mmd_tools.' + pmxModel.name + '_all')
         logging.debug('Create all group: %s', self.__allObjGroup.name)
-        self.__rigidObjGroup = bpy.data.groups.new(name='mmd_tools.' + pmxModel.name + '_rigids')
+        self.__rigidObjGroup = bpy.data.collections.new(name='mmd_tools.' + pmxModel.name + '_rigids')
         logging.debug('Create rigid group: %s', self.__rigidObjGroup.name)
-        self.__jointObjGroup = bpy.data.groups.new(name='mmd_tools.' + pmxModel.name + '_joints')
+        self.__jointObjGroup = bpy.data.collections.new(name='mmd_tools.' + pmxModel.name + '_joints')
         logging.debug('Create joint group: %s', self.__jointObjGroup.name)
-        self.__tempObjGroup = bpy.data.groups.new(name='mmd_tools.' + pmxModel.name + '_temp')
+        self.__tempObjGroup = bpy.data.collections.new(name='mmd_tools.' + pmxModel.name + '_temp')
         logging.debug('Create temporary group: %s', self.__tempObjGroup.name)
 
     def __importVertexGroup(self):
@@ -110,7 +111,7 @@ class PMXImporter:
         for i, pv in enumerate(pmxModel.vertices):
             bv = mesh.vertices[i]
 
-            bv.co = mathutils.Vector(pv.co) * self.TO_BLE_MATRIX * self.__scale
+            bv.co = mathutils.Vector(pv.co) @ self.TO_BLE_MATRIX * self.__scale
             bv.normal = pv.normal
 
             if isinstance(pv.weight.weights, pmx.BoneWeightSDEF):
@@ -127,6 +128,7 @@ class PMXImporter:
                     self.__vertexGroupTable[bone].add(index=[i], weight=weight, type='REPLACE')
             else:
                 raise Exception('unkown bone weight type.')
+        
 
     def __importTextures(self):
         pmxModel = self.__model
@@ -153,7 +155,7 @@ class PMXImporter:
         with bpyutils.edit_object(obj) as data:
             for i in pmx_bones:
                 bone = data.edit_bones.new(name=i.name)
-                loc = mathutils.Vector(i.location) * self.__scale * self.TO_BLE_MATRIX
+                loc = mathutils.Vector(i.location) * self.__scale @ self.TO_BLE_MATRIX
                 bone.head = loc
                 editBoneTable.append(bone)
                 nameTable.append(bone.name)
@@ -172,7 +174,7 @@ class PMXImporter:
                     else:
                         b_bone.tail = b_bone.head
                 else:
-                    loc = mathutils.Vector(m_bone.displayConnection) * self.TO_BLE_MATRIX * self.__scale
+                    loc = mathutils.Vector(m_bone.displayConnection) @ self.TO_BLE_MATRIX * self.__scale
                     b_bone.tail = b_bone.head + loc
 
             for b_bone, m_bone in zip(editBoneTable, pmx_bones):
@@ -304,10 +306,10 @@ class PMXImporter:
         self.__rigidTable = []
         start_time = time.time()
         for rigid in self.__model.rigids:
-            loc = mathutils.Vector(rigid.location) * self.TO_BLE_MATRIX * self.__scale
-            rot = mathutils.Vector(rigid.rotation) * self.TO_BLE_MATRIX * -1
+            loc = mathutils.Vector(rigid.location) @ self.TO_BLE_MATRIX * self.__scale
+            rot = mathutils.Vector(rigid.rotation) @ self.TO_BLE_MATRIX * -1
             if rigid.type == pmx.Rigid.TYPE_BOX:
-                size = mathutils.Vector(rigid.size) * self.TO_BLE_MATRIX
+                size = mathutils.Vector(rigid.size) @ self.TO_BLE_MATRIX
             else:
                 size = mathutils.Vector(rigid.size)
 
@@ -329,7 +331,7 @@ class PMXImporter:
                 bounce = rigid.bounce,
                 bone = None if rigid.bone == -1 or rigid.bone is None else self.__boneTable[rigid.bone].name,
                 )
-            obj.hide = True
+            obj.hide_set(True)
             self.__rigidObjGroup.objects.link(obj)
             self.__rigidTable.append(obj)
 
@@ -341,8 +343,8 @@ class PMXImporter:
     def __importJoints(self):
         self.__jointTable = []
         for joint in self.__model.joints:
-            loc = mathutils.Vector(joint.location) * self.TO_BLE_MATRIX * self.__scale
-            rot = mathutils.Vector(joint.rotation) * self.TO_BLE_MATRIX * -1
+            loc = mathutils.Vector(joint.location) @ self.TO_BLE_MATRIX * self.__scale
+            rot = mathutils.Vector(joint.rotation) @ self.TO_BLE_MATRIX * -1
 
             obj = self.__rig.createJoint(
                 name = joint.name,
@@ -352,14 +354,14 @@ class PMXImporter:
                 size = 0.5 * self.__scale,
                 rigid_a = self.__rigidTable[joint.src_rigid],
                 rigid_b = self.__rigidTable[joint.dest_rigid],
-                maximum_location = mathutils.Vector(joint.maximum_location) * self.TO_BLE_MATRIX * self.__scale,
-                minimum_location = mathutils.Vector(joint.minimum_location) * self.TO_BLE_MATRIX * self.__scale,
-                maximum_rotation = mathutils.Vector(joint.maximum_rotation) * self.TO_BLE_MATRIX * -1,
-                minimum_rotation = mathutils.Vector(joint.minimum_rotation) * self.TO_BLE_MATRIX * -1,
-                spring_linear = mathutils.Vector(joint.spring_constant) * self.TO_BLE_MATRIX,
-                spring_angular = mathutils.Vector(joint.spring_rotation_constant) * self.TO_BLE_MATRIX,
+                maximum_location = mathutils.Vector(joint.maximum_location) @ self.TO_BLE_MATRIX * self.__scale,
+                minimum_location = mathutils.Vector(joint.minimum_location) @ self.TO_BLE_MATRIX * self.__scale,
+                maximum_rotation = mathutils.Vector(joint.maximum_rotation) @ self.TO_BLE_MATRIX * -1,
+                minimum_rotation = mathutils.Vector(joint.minimum_rotation) @ self.TO_BLE_MATRIX * -1,
+                spring_linear = mathutils.Vector(joint.spring_constant) @ self.TO_BLE_MATRIX,
+                spring_angular = mathutils.Vector(joint.spring_rotation_constant) @ self.TO_BLE_MATRIX,
                 )
-            obj.hide = True
+            obj.hide_set(True)
             self.__jointTable.append(obj)
             self.__jointObjGroup.objects.link(obj)
 
@@ -374,20 +376,32 @@ class PMXImporter:
             mat = bpy.data.materials.new(name=i.name)
             self.__materialTable.append(mat)
             mmd_mat = mat.mmd_material
-            mat.diffuse_color = i.diffuse[0:3]
-            mat.alpha = i.diffuse[3]
+            mat.use_nodes = True
+            mat.diffuse_color = i.diffuse[0:4]
             mat.specular_color = i.specular[0:3]
-            mat.specular_alpha = i.specular[3]
-            mat.use_shadows = i.enabled_self_shadow
-            mat.use_transparent_shadows = i.enabled_self_shadow
-            mat.use_cast_buffer_shadows = i.enabled_self_shadow_map # only buffer shadows
-            if hasattr(mat, 'use_cast_shadows'):
+            mat.specular_intensity = i.specular[3]
+            mat.shadow_method = 'HASHED'
+            mat.blend_method = 'HASHED'
+            mat.use_screen_refraction = True
+            #mat.use_shadows = i.enabled_self_shadow
+            #mat.use_transparent_shadows = i.enabled_self_shadow
+            #mat.use_cast_buffer_shadows = i.enabled_self_shadow_map # only buffer shadows
+            #if hasattr(mat, 'use_cast_shadows'):
                 # "use_cast_shadows" is not supported in older Blender (< 2.71),
                 # so we still use "use_cast_buffer_shadows".
-                mat.use_cast_shadows = i.enabled_self_shadow_map
-            if mat.alpha < 1.0 or mat.specular_alpha < 1.0 or i.texture != -1:
-                mat.use_transparency = True
-                mat.transparency_method = 'Z_TRANSPARENCY'
+                #mat.use_cast_shadows = i.enabled_self_shadow_map
+            #if mat.alpha < 1.0 or mat.specular_alpha < 1.0 or i.texture != -1:
+                #mat.use_transparency = True
+                #mat.transparency_method = 'Z_TRANSPARENCY'
+            #fit for cycles
+            mat.node_tree.links.clear()
+            shader = mat.node_tree.nodes['Principled BSDF']
+            #texture = None
+            outplug = shader.outputs[0]
+
+            mat.node_tree.links.new(mat.node_tree.nodes['Material Output'].inputs['Surface'], outplug)
+            mat.node_tree.nodes['Material Output'].location.x = shader.location.x + 500
+            mat.node_tree.nodes['Material Output'].location.y = shader.location.y - 150
 
             mmd_mat.name_j = i.name
             mmd_mat.name_e = i.name_e
@@ -418,8 +432,12 @@ class PMXImporter:
             self.__meshObj.data.materials.append(mat)
             fnMat = FnMaterial(mat)
             if i.texture != -1:
-                texture_slot = fnMat.create_texture(self.__textureTable[i.texture])
-                texture_slot.texture.use_mipmap = self.__use_mipmap
+                texnode = fnMat.create_texture(self.__textureTable[i.texture],shader)
+                #texture_slot = fnMat.create_texture(self.__textureTable[i.texture])
+                #texture_slot.texture.use_mipmap = self.__use_mipmap
+                mat.node_tree.links.new(shader.inputs['Base Color'], texnode.outputs['Color'])
+                mat.node_tree.links.new(shader.inputs['Alpha'], texnode.outputs['Alpha'])
+            '''
             if i.sphere_texture_mode == 2:
                 amount = self.__spa_blend_factor
                 blend = 'ADD'
@@ -432,24 +450,32 @@ class PMXImporter:
                     texture_slot.texture.image.use_alpha = False
                 texture_slot.diffuse_color_factor = amount
                 texture_slot.blend_type = blend
-
+                '''
+    
     def __importFaces(self):
         pmxModel = self.__model
         mesh = self.__meshObj.data
 
-        mesh.tessfaces.add(len(pmxModel.faces))
-        uvLayer = mesh.tessface_uv_textures.new()
+        mesh.loops.add(len(pmxModel.faces)*3)
+        mesh.polygons.add(len(pmxModel.faces))
+        uvLayer = mesh.uv_layers.new()
         for i, f in enumerate(pmxModel.faces):
-            bf = mesh.tessfaces[i]
-            bf.vertices_raw = list(f) + [0]
-            bf.use_smooth = True
-            face_count = 0
-            uv = uvLayer.data[i]
-            uv.uv1 = self.flipUV_V(pmxModel.vertices[f[0]].uv)
-            uv.uv2 = self.flipUV_V(pmxModel.vertices[f[1]].uv)
-            uv.uv3 = self.flipUV_V(pmxModel.vertices[f[2]].uv)
-
+            bf = mesh.polygons[i]
+            #bf.vertices = list(f) + [0]
+            #bf.use_smooth = True
+            #face_count = 0
             bf.material_index = self.__getMaterialIndexFromFaceIndex(i)
+            mesh.loops[(i-1)*3].vertex_index = f[0]
+            mesh.loops[(i-1)*3+1].vertex_index = f[1]
+            mesh.loops[(i-1)*3+2].vertex_index = f[2]
+            mesh.polygons[i].loop_start = (i-1)*3
+            mesh.polygons[i].loop_total = 3
+            uvLayer.data[(i-1)*3+0].uv = self.flipUV_V(pmxModel.vertices[f[0]].uv)
+            uvLayer.data[(i-1)*3+1].uv = self.flipUV_V(pmxModel.vertices[f[1]].uv)
+            uvLayer.data[(i-1)*3+2].uv = self.flipUV_V(pmxModel.vertices[f[2]].uv)
+
+        mesh.update()
+        mesh.validate()
 
     def __importVertexMorphs(self):
         pmxModel = self.__model
@@ -470,7 +496,7 @@ class PMXImporter:
             vtx_morph.category = categories.get(morph.category, 'OTHER')
             for md in morph.offsets:
                 shapeKeyPoint = shapeKey.data[md.index]
-                offset = mathutils.Vector(md.offset) * self.TO_BLE_MATRIX
+                offset = mathutils.Vector(md.offset) @ self.TO_BLE_MATRIX
                 shapeKeyPoint.co = shapeKeyPoint.co + offset * self.__scale
 
     def __importMaterialMorphs(self):
@@ -517,7 +543,7 @@ class PMXImporter:
                 bl_bone = self.__boneTable[morph_data.index]            
                 data.bone = bl_bone.name
                 mat = VMDImporter.makeVMDBoneLocationToBlenderMatrix(bl_bone)
-                data.location = mat * mathutils.Vector(morph_data.location_offset) * self.__scale
+                data.location = mat @ mathutils.Vector(morph_data.location_offset) * self.__scale
                 data.rotation = VMDImporter.convertVMDBoneRotationToBlender(bl_bone, morph_data.rotation_offset)
 
     def __importDisplayFrames(self):

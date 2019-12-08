@@ -21,7 +21,7 @@ class MMDMaterialPanel(Panel):
         layout = self.layout
 
         col = layout.column(align=True)
-        col.label('Information:')
+        col.label(text ='Information:')
         c = col.column()
         r = c.row()
         r.prop(mmd_material, 'name_j')
@@ -31,23 +31,23 @@ class MMDMaterialPanel(Panel):
         r.prop(mmd_material, 'comment')
 
         col = layout.column(align=True)
-        col.label('Color:')
+        col.label(text = 'Color:')
         c = col.column()
         r = c.row()
         r.prop(material, 'diffuse_color')
         r = c.row()
-        r.label('Diffuse Alpha:')
+        r.label(text = 'Diffuse Alpha:')
         r.prop(material, 'alpha')
         r = c.row()
         r.prop(mmd_material, 'ambient_color')
         r = c.row()
         r.prop(material, 'specular_color')
         r = c.row()
-        r.label('Specular Alpha:')
+        r.label(text = 'Specular Alpha:')
         r.prop(material, 'specular_alpha')
 
         col = layout.column(align=True)
-        col.label('Shadow:')
+        col.label(text = 'Shadow:')
         c = col.column()
         r = c.row()
         r.prop(mmd_material, 'is_double_sided')
@@ -57,7 +57,7 @@ class MMDMaterialPanel(Panel):
         r.prop(mmd_material, 'enabled_self_shadow')
 
         col = layout.column(align=True)
-        col.label('Edge:')
+        col.label(text = 'Edge:')
         c = col.column()
         r = c.row()
         r.prop(mmd_material, 'enabled_toon_edge')
@@ -85,11 +85,12 @@ class MMDTexturePanel(Panel):
         layout = self.layout
 
 
-        tex_slots = material.texture_slots.values()
+        #tex_slots = material.texture_slots.values()
         col = layout.column(align=True)
         row = col.row(align=True)
-        row.label('Texture:')
+        row.label(text = 'NoTexture:')
         r = row.column(align=True)
+        '''
         if tex_slots[0]:
             tex = tex_slots[0].texture
             if tex.type == 'IMAGE' and tex.image:
@@ -98,12 +99,12 @@ class MMDTexturePanel(Panel):
                 r2.operator('mmd_tools.material_remove_texture', text='', icon='PANEL_CLOSE')
             else:
                 r.operator('mmd_tools.material_remove_texture', text='Remove', icon='PANEL_CLOSE')
-                col.label('Texture is invalid.', icon='ERROR')
+                col.label(text = 'Texture is invalid.', icon='ERROR')
         else:
             r.operator('mmd_tools.material_open_texture', text='Add', icon='FILESEL')
 
         row = col.row(align=True)
-        row.label('Sphere Texture:')
+        row.label(text = 'Sphere Texture:')
         r = row.column(align=True)
         if tex_slots[1]:
             tex = tex_slots[1].texture
@@ -112,9 +113,10 @@ class MMDTexturePanel(Panel):
                 r2.prop(tex.image, 'filepath', text='')
             else:
                 r.operator('mmd_tools.material_remove_sphere_texture', text='Remove', icon='PANEL_CLOSE')
-                col.label('Sphere Texture is invalid.', icon='ERROR')
+                col.label(text = 'Sphere Texture is invalid.', icon='ERROR')
         else:
             r.operator('mmd_tools.material_open_texture', text='Add', icon='FILESEL')
+        '''
 
         col = layout.column(align=True)
         c = col.column()

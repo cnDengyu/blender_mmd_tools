@@ -34,7 +34,7 @@ class VMDImporter:
             [0.0, 0.0, 1.0, 0.0],
             [0.0, 1.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 1.0]])
-        return mat * mat2
+        return mat @ mat2
 
     @staticmethod
     def convertVMDBoneRotationToBlender(blender_bone, rotation):
@@ -48,7 +48,7 @@ class VMDImporter:
         mat[0][2], mat[1][2], mat[2][2] = blender_bone.x_axis.z, blender_bone.y_axis.z, blender_bone.z_axis.z
         (vec, angle) = rotation.to_axis_angle()
         v = mathutils.Vector((-vec.x, -vec.z, -vec.y))
-        return mathutils.Quaternion(mat*v, angle).normalized()
+        return mathutils.Quaternion(mat @ v, angle).normalized()
 
     @staticmethod
     def __fixRotations(rotation_ary):
@@ -121,7 +121,7 @@ class VMDImporter:
             bone = pose_bones[name]
             frameNumbers = map(lambda x: x.frame_number, keyFrames)
             mat = self.makeVMDBoneLocationToBlenderMatrix(bone)
-            locations = map(lambda x: mat * mathutils.Vector(x.location) * self.__scale, keyFrames)
+            locations = map(lambda x: mat @ mathutils.Vector(x.location) * self.__scale, keyFrames)
             rotations = map(lambda x: self.convertVMDBoneRotationToBlender(bone, x.rotation), keyFrames)
             rotations = self.__fixRotations(rotations)
 

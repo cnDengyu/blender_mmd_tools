@@ -30,7 +30,7 @@ class MMDCamera:
             return MMDCamera(cameraObj)
 
         empty = bpy.data.objects.new(name='MMD_Camera', object_data=None)
-        bpy.context.scene.objects.link(empty)
+        bpy.context.scene.collection.objects.link(empty)
 
         empty.rotation_mode = 'YXZ'
         empty.mmd_type = 'CAMERA'

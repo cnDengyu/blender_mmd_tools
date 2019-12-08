@@ -20,9 +20,9 @@ def _toggleVisibilityOfMeshes(self, context):
     objects = list(rig.meshes())
     hide = not self.show_meshes
     if hide and context.active_object in objects:
-        context.scene.objects.active = root
+        context.view_layer.objects.active = root
     for i in objects:
-        i.hide = hide
+        i.hide_set(hide)
 
 def _toggleVisibilityOfRigidBodies(self, context):
     root = self.id_data
@@ -30,9 +30,9 @@ def _toggleVisibilityOfRigidBodies(self, context):
     objects = list(rig.rigidBodies())
     hide = not self.show_rigid_bodies
     if hide and context.active_object in objects:
-        context.scene.objects.active = root
+        context.view_layer.objects.active = root
     for i in objects:
-        i.hide = hide
+        i.hide_set(hide)
 
 def _toggleVisibilityOfJoints(self, context):
     root = self.id_data
@@ -40,9 +40,9 @@ def _toggleVisibilityOfJoints(self, context):
     objects = list(rig.joints())
     hide = not self.show_joints
     if hide and context.active_object in objects:
-        context.scene.objects.active = root
+        context.view_layer.objects.active = root
     for i in objects:
-        i.hide = hide
+        i.hide_set(hide)
 
 def _toggleVisibilityOfTemporaryObjects(self, context):
     root = self.id_data
@@ -50,9 +50,9 @@ def _toggleVisibilityOfTemporaryObjects(self, context):
     objects = list(rig.temporaryObjects())
     hide = not self.show_temporary_objects
     if hide and context.active_object in objects:
-        context.scene.objects.active = root
+        context.view_layer.objects.active = root
     for i in objects:
-        i.hide = hide
+        i.hide_set(hide)
 
 def _toggleShowNamesOfRigidBodies(self, context):
     root = self.id_data
@@ -72,16 +72,16 @@ def _setVisibilityOfMMDRigArmature(obj, v):
     rig = mmd_model.Model(obj)
     arm = rig.armature()
     if bpy.context.active_object == arm:
-        bpy.context.scene.objects.active = obj
-    arm.hide = not v
+        bpy.context.view_layer.objects.active = obj
+    arm.hide_set(not v)
 
 def _setActiveRigidbodyObject(prop, v):
     obj = bpy.context.scene.objects[v]
     root = prop.id_data
     rig = mmd_model.Model(root)
     for i in rig.rigidBodies():
-        i.hide = False
-    if not obj.hide:
+        i.hide_set(False)
+    if not obj.hide_get():
         utils.selectAObject(obj)
     prop['active_rigidbody_object_index'] = v
 
@@ -93,8 +93,8 @@ def _setActiveJointObject(prop, v):
     root = prop.id_data
     rig = mmd_model.Model(root)
     for i in rig.joints():
-        i.hide = False
-    if not obj.hide:
+        i.hide_set(False)
+    if not obj.hide_get():
         utils.selectAObject(obj)
     prop['active_joint_object_index'] = v
 
@@ -202,7 +202,7 @@ class MMDRoot(PropertyGroup):
 
     show_armature = BoolProperty(
         name='Show Armature',
-        get=lambda x: not mmd_model.Model(x.id_data).armature().hide,
+        get=lambda x: not mmd_model.Model(x.id_data).armature().hide_get(),
         set=lambda x, v: _setVisibilityOfMMDRigArmature(x.id_data, v),
         )
 

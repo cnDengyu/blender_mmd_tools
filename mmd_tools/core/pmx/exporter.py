@@ -236,7 +236,7 @@ class __PmxExporter:
                 pmx_bone.hasAdditionalLocation = mmd_bone.has_additional_location
 
                 pmx_bone.name_e = p_bone.mmd_bone.name_e or ''
-                pmx_bone.location = world_mat * mathutils.Vector(bone.head) * self.__scale * self.TO_PMX_MATRIX
+                pmx_bone.location = world_mat @ mathutils.Vector(bone.head) * self.__scale @ self.TO_PMX_MATRIX
                 pmx_bone.parent = bone.parent
                 pmx_bone.visible = mmd_bone.is_visible
                 pmx_bone.isMovable = not all(p_bone.lock_location)
@@ -249,7 +249,7 @@ class __PmxExporter:
                 if p_bone.mmd_bone.is_tip:
                     pmx_bone.displayConnection = -1
                 elif p_bone.mmd_bone.use_tail_location:
-                    tail_loc = world_mat * mathutils.Vector(bone.tail) * self.__scale * self.TO_PMX_MATRIX
+                    tail_loc = world_mat @ mathutils.Vector(bone.tail) * self.__scale @ self.TO_PMX_MATRIX
                     pmx_bone.displayConnection = tail_loc - pmx_bone.location
                 else:
                     for child in bone.children:
@@ -540,8 +540,8 @@ class __PmxExporter:
             p_rigid = pmx.Rigid()
             p_rigid.name = obj.mmd_rigid.name
             p_rigid.name_e = obj.mmd_rigid.name_e
-            p_rigid.location = mathutils.Vector(obj.location) * self.__scale * self.TO_PMX_MATRIX
-            p_rigid.rotation = mathutils.Vector(obj.rotation_euler) * self.TO_PMX_MATRIX * -1
+            p_rigid.location = mathutils.Vector(obj.location) * self.__scale @ self.TO_PMX_MATRIX
+            p_rigid.rotation = mathutils.Vector(obj.rotation_euler) @ self.TO_PMX_MATRIX * -1
             p_rigid.mode = int(obj.mmd_rigid.type)
 
             rigid_shape = obj.mmd_rigid.shape
@@ -588,33 +588,33 @@ class __PmxExporter:
             mmd_joint = joint.mmd_joint
             p_joint.name = mmd_joint.name_j
             p_joint.name_e = mmd_joint.name_e
-            p_joint.location = (mathutils.Vector(joint.location) * self.TO_PMX_MATRIX * self.__scale).xyz
-            p_joint.rotation = (mathutils.Vector(joint.rotation_euler) * self.TO_PMX_MATRIX * -1).xyz
+            p_joint.location = (mathutils.Vector(joint.location) @ self.TO_PMX_MATRIX * self.__scale).xyz
+            p_joint.rotation = (mathutils.Vector(joint.rotation_euler) @ self.TO_PMX_MATRIX * -1).xyz
             p_joint.src_rigid = rigid_map.get(rbc.object1, -1)
             p_joint.dest_rigid = rigid_map.get(rbc.object2, -1)
             p_joint.maximum_location = (mathutils.Vector([
                 rbc.limit_lin_x_upper,
                 rbc.limit_lin_y_upper,
                 rbc.limit_lin_z_upper,
-                ]) * self.TO_PMX_MATRIX * self.__scale).xyz
+                ]) @ self.TO_PMX_MATRIX * self.__scale).xyz
             p_joint.minimum_location =(mathutils.Vector([
                 rbc.limit_lin_x_lower,
                 rbc.limit_lin_y_lower,
                 rbc.limit_lin_z_lower,
-                ]) * self.TO_PMX_MATRIX * self.__scale).xyz
+                ]) @ self.TO_PMX_MATRIX * self.__scale).xyz
             p_joint.maximum_rotation = (mathutils.Vector([
                 rbc.limit_ang_x_lower,
                 rbc.limit_ang_y_lower,
                 rbc.limit_ang_z_lower,
-                ]) * self.TO_PMX_MATRIX * -1).xyz
+                ]) @ self.TO_PMX_MATRIX * -1).xyz
             p_joint.minimum_rotation = (mathutils.Vector([
                 rbc.limit_ang_x_upper,
                 rbc.limit_ang_y_upper,
                 rbc.limit_ang_z_upper,
-                ]) * self.TO_PMX_MATRIX * -1).xyz
+                ]) @ self.TO_PMX_MATRIX * -1).xyz
 
-            p_joint.spring_constant = (mathutils.Vector(mmd_joint.spring_linear) * self.TO_PMX_MATRIX).xyz
-            p_joint.spring_rotation_constant = (mathutils.Vector(mmd_joint.spring_angular) * self.TO_PMX_MATRIX).xyz
+            p_joint.spring_constant = (mathutils.Vector(mmd_joint.spring_linear) @ self.TO_PMX_MATRIX).xyz
+            p_joint.spring_rotation_constant = (mathutils.Vector(mmd_joint.spring_angular) @ self.TO_PMX_MATRIX).xyz
             self.__model.joints.append(p_joint)
 
 

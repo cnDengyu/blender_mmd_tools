@@ -23,7 +23,7 @@ class MMDBonePanel(Panel):
         layout = self.layout
         c = layout.column(align=True)
 
-        c.label('Information:')
+        c.label(text = 'Information:')
         c.prop(pose_bone.mmd_bone, 'name_j')
         c.prop(pose_bone.mmd_bone, 'name_e')
         c.label(text='ID: %d'%(pose_bone.mmd_bone.bone_id))

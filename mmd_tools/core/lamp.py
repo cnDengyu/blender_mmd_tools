@@ -58,12 +58,12 @@ class MMDLamp:
 
         name = 'MMD_' + lampObj.name + '_target'
         empty = bpy.data.objects.new(name=name, object_data=None)
-        bpy.context.scene.objects.link(empty)
+        bpy.context.scene.collection.objects.link(empty)
 
         name = 'MMD_' + lampObj.name + '_source'
         armature = bpy.data.armatures.new(name=name)
         armatureObj = bpy.data.objects.new(name=name, object_data=armature)
-        bpy.context.scene.objects.link(armatureObj)
+        bpy.context.scene.collection.objects.link(armatureObj)
 
         utils.enterEditMode(armatureObj)
         bone = armature.edit_bones.new(name='handle')
@@ -82,8 +82,8 @@ class MMDLamp:
         armatureObj.lock_location = (True, True, True)
         armatureObj.lock_rotation = (True, True, True)
         armatureObj.lock_scale = (False, False, False)
-        armatureObj.draw_type = 'WIRE'
-        armature.draw_type = 'BBONE'
+        armatureObj.display_type = 'WIRE'
+        armature.display_type = 'BBONE'
 
         poseBone = armatureObj.pose.bones[0]
         poseBone.location =  mathutils.Vector((0,0,0))

@@ -144,15 +144,15 @@ class ImportVmdToMMDModel(Operator, ImportHelper):
         rig = mmd_model.Model(root)
         importer = vmd_importer.VMDImporter(filepath=self.filepath, scale=root.mmd_root.scale, frame_margin=self.margin)
         arm = rig.armature()
-        t = arm.hide
-        arm.hide = False
+        t = arm.hide_get()
+        arm.hide_set(False)
         importer.assign(arm)
-        arm.hide = t
+        arm.hide_set(t)
         for i in rig.meshes():
-            t = i.hide
-            i.hide = False
+            t = i.hide_get()
+            i.hide_set(False)
             importer.assign(i)
-            i.hide = t
+            i.hide_set(t)
         if self.update_scene_settings:
             auto_scene_setup.setupFrameRanges()
             auto_scene_setup.setupFps()

@@ -503,7 +503,7 @@ class SelectRelatedBone(Operator):
             return { 'CANCELLED' }                    
         armature.data.bones.active = armature.pose.bones[morph_data.bone].bone
         bpy.ops.object.mode_set(mode='POSE')
-        armature.pose.bones[morph_data.bone].bone.select=True
+        armature.pose.bones[morph_data.bone].bone.select_set(True)
         
         return { 'FINISHED' }
 
@@ -545,7 +545,7 @@ class EditBoneOffset(Operator):
         morph = mmd_root.bone_morphs[mmd_root.active_morph]
         morph_data = morph.data[morph.active_bone_data]
         p_bone = armature.pose.bones[morph_data.bone]
-        p_bone.bone.select = True
+        p_bone.bone.select_set(True)
         bpy.ops.pose.transforms_clear()
         p_bone.location = morph_data.location
         p_bone.rotation_quaternion = morph_data.rotation

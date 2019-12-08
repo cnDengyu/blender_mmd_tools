@@ -103,7 +103,11 @@ def convertToCyclesShader(obj):
                     texture.location.x  = shader.location.x - 250
                     texture.location.y  = shader.location.y - 150
                     texture.image = j.texture.image
-
+                    
+        i.material.node_tree.links.new(i.material.node_tree.nodes['Material Output'].inputs['Surface'], outplug)
+        i.material.node_tree.nodes['Material Output'].location.x = shader.location.x + 500
+        i.material.node_tree.nodes['Material Output'].location.y = shader.location.y - 150
+'''
         if texture is not None or i.material.alpha < 1.0:
             alpha_shader = i.material.node_tree.nodes.new('ShaderNodeGroup')
             alpha_shader.location.x = shader.location.x + 250
@@ -139,7 +143,4 @@ def convertToCyclesShader(obj):
             shader.inputs[0].default_value = list(i.material.diffuse_color) + [1.0]
             if i.material.alpha < 1.0:
                 alpha_shader.inputs[1].default_value = i.material.alpha
-
-        i.material.node_tree.links.new(i.material.node_tree.nodes['Material Output'].inputs['Surface'], outplug)
-        i.material.node_tree.nodes['Material Output'].location.x = shader.location.x + 500
-        i.material.node_tree.nodes['Material Output'].location.y = shader.location.y - 150
+'''

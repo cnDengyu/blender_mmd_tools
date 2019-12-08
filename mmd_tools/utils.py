@@ -10,8 +10,8 @@ def selectAObject(obj):
     except Exception:
         pass
     bpy.ops.object.select_all(action='DESELECT')
-    bpy.context.scene.objects.active = obj
-    obj.select=True
+    bpy.context.view_layer.objects.active = obj
+    obj.select_set(True)
 
 ## 現在のモードを指定したオブジェクトのEdit Modeに変更する
 def enterEditMode(obj):
@@ -25,8 +25,8 @@ def setParentToBone(obj, parent, bone_name):
     selectAObject(parent)
     bpy.ops.object.mode_set(mode='POSE')
     selectAObject(obj)
-    bpy.context.scene.objects.active = parent
-    parent.select = True
+    bpy.context.view_layer.objects.active = parent
+    parent.select_set(True)
     bpy.ops.object.mode_set(mode='POSE')
     parent.data.bones.active = parent.data.bones[bone_name]
     bpy.ops.object.parent_set(type='BONE', xmirror=False, keep_transform=False)

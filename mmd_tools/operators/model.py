@@ -30,7 +30,7 @@ class BuildRig(Operator):
         root = mmd_model.Model.findRoot(context.active_object)
         rig = mmd_model.Model(root)
         rig.build()
-        context.scene.objects.active = obj
+        context.view_layer.objects.active = obj
         return {'FINISHED'}
 
 class ApplyAdditionalTransformConstraints(Operator):
@@ -46,7 +46,7 @@ class ApplyAdditionalTransformConstraints(Operator):
     def execute(self, context):
         root = mmd_model.Model.findRoot(context.active_object)
         mmd_model.Model(root)
-        #context.scene.objects.active = obj
+        #context.view_layer.objects.active = obj
         return {'FINISHED'}
 
 class CreateMMDModelRoot(Operator):

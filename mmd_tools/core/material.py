@@ -35,7 +35,7 @@ class FnMaterial(object):
     def material(self):
         return self.__material
 
-    def create_texture(self, filepath):
+    def create_texture(self, filepath,shader):
         """ create a texture slot for textures of MMD models.
 
         Args:
@@ -45,20 +45,28 @@ class FnMaterial(object):
         Returns:
             bpy.types.MaterialTextureSlot object
         """
+        '''
         texture_slot = self.__material.texture_slots.create(0)
         texture_slot.use_map_alpha = True
         texture_slot.texture_coords = 'UV'
         texture_slot.blend_type = 'MULTIPLY'
         texture_slot.texture = bpy.data.textures.new(name=self.__material.name, type='IMAGE')
+        '''
+
+        texture = self.__material.node_tree.nodes.new('ShaderNodeTexImage')
+        texture.location.x  = shader.location.x - 250
+        texture.location.y  = shader.location.y - 150
+        texture.image = bpy.data.textures.new(name=self.__material.name, type='IMAGE').image
+
         if os.path.isfile(filepath):
-            texture_slot.texture.image = bpy.data.images.load(filepath)
+            texture.image = bpy.data.images.load(filepath)
         else:
             logging.warning('Cannot create a texture for %s. No such file.', filepath)
-        return texture_slot
+        return texture
 
 
     def remove_texture(self):
-        self.__material.texture_slots.clear(0)
+        self.__material.texture_paint_slots.clear(0)
 
 
     def create_sphere_texture(self, filepath):
@@ -71,6 +79,7 @@ class FnMaterial(object):
         Returns:
             bpy.types.MaterialTextureSlot object
         """
+        
         texture_slot = self.__material.texture_slots.create(1)
         texture_slot.texture_coords = 'NORMAL'
         texture_slot.texture = bpy.data.textures.new(name=self.__material.name + '_sph', type='IMAGE')

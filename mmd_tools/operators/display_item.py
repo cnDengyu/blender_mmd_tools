@@ -155,15 +155,15 @@ class SelectCurrentDisplayItem(Operator):
 
         arm = rig.armature()
         for i in context.scene.objects:
-            i.select = False
-        arm.hide = False
-        arm.select = True
-        context.scene.objects.active = arm
+            i.select_set(False)
+        arm.hide_set(False)
+        arm.select_set(True)
+        context.view_layer.objects.active = arm
 
         bpy.ops.object.mode_set(mode='POSE')
         frame = mmd_root.display_item_frames[mmd_root.active_display_item_frame]
         item = frame.items[frame.active_item]
         bone_name = item.name
         for i in arm.pose.bones:
-            i.bone.select = (i.name == bone_name)
+            i.bone.select_set(i.name == bone_name)
         return {'FINISHED'}

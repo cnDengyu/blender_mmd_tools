@@ -9,7 +9,7 @@ import mmd_tools.core.model as mmd_model
 
 class _PanelBase(object):
     bl_space_type = 'VIEW_3D'
-    bl_region_type = 'TOOLS'
+    bl_region_type = 'UI'
     bl_category = 'mmd_tools'
 
 
@@ -24,12 +24,12 @@ class MMDToolsObjectPanel(_PanelBase, Panel):
         layout = self.layout
 
         col = layout.column(align=True)
-        col.label('Edit:')
+        col.label(text = 'Edit:')
         row = col.row(align=True)
         row.operator(operators.model.CreateMMDModelRoot.bl_idname, text='Create Model')
         row.operator(operators.fileio.ImportPmx.bl_idname, text='Import Model')
         col = layout.column(align=True)
-        col.operator(operators.material.ConvertMaterialsForCycles.bl_idname, text='Convert Materials For Cycles')
+        #col.operator(operators.material.ConvertMaterialsForCycles.bl_idname, text='Convert Materials For Cycles')
         if active_obj is not None and active_obj.type == 'MESH':
             col.operator('mmd_tools.separate_by_materials', text='Separate By Materials')
 
@@ -41,18 +41,18 @@ class MMDToolsObjectPanel(_PanelBase, Panel):
             return
 
         col = self.layout.column(align=True)
-        col.label('Rigidbody:')
+        col.label(text = 'Rigidbody:')
         row = col.row(align=True)
         row.operator('mmd_tools.build_rig')
         row.operator('mmd_tools.clean_rig')
         if not root.mmd_root.is_built:
             col.label(text='Press the "Build" button before playing the physical animation.', icon='ERROR')
 
-        col.label('Bone Constraints:')
+        col.label(text = 'Bone Constraints:')
         col.operator('mmd_tools.apply_additioinal_transform')
 
         col = self.layout.column(align=True)
-        col.label('Import/Export:')
+        col.label(text = 'Import/Export:')
         col.operator(operators.fileio.ImportVmdToMMDModel.bl_idname, text='Import Motion')
         col.operator(operators.fileio.ExportPmx.bl_idname, text='Export Model')
 
@@ -134,7 +134,7 @@ class MMDDisplayItemsPanel(_PanelBase, Panel):
             root = mmd_model.Model.findRoot(active_obj)
         if root is None:
             c = self.layout.column()
-            c.label('Select a MMD Model')
+            c.label(text = 'Select a MMD Model')
             return
 
         rig = mmd_model.Model(root)
@@ -142,7 +142,7 @@ class MMDDisplayItemsPanel(_PanelBase, Panel):
         mmd_root = root.mmd_root
         col = self.layout.column()
         c = col.column(align=True)
-        c.label('Frames')
+        c.label(text = 'Frames')
         row = c.row()
         row.template_list(
             "MMD_ROOT_UL_display_item_frames",
@@ -152,8 +152,8 @@ class MMDDisplayItemsPanel(_PanelBase, Panel):
             )
         tb = row.column()
         tb1 = tb.column(align=True)
-        tb1.operator(operators.display_item.AddDisplayItemFrame.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.display_item.RemoveDisplayItemFrame.bl_idname, text='', icon='ZOOMOUT')
+        tb1.operator(operators.display_item.AddDisplayItemFrame.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.display_item.RemoveDisplayItemFrame.bl_idname, text='', icon='ZOOM_OUT')
         tb.separator()
         tb1 = tb.column(align=True)
         tb1.operator(operators.display_item.MoveUpDisplayItemFrame.bl_idname, text='', icon='TRIA_UP')
@@ -171,8 +171,8 @@ class MMDDisplayItemsPanel(_PanelBase, Panel):
             )
         tb = row.column()
         tb1 = tb.column(align=True)
-        tb1.operator(operators.display_item.AddDisplayItem.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.display_item.RemoveDisplayItem.bl_idname, text='', icon='ZOOMOUT')
+        tb1.operator(operators.display_item.AddDisplayItem.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.display_item.RemoveDisplayItem.bl_idname, text='', icon='ZOOM_OUT')
         tb.separator()
         tb1 = tb.column(align=True)
         tb1.operator(operators.display_item.MoveUpDisplayItem.bl_idname, text='', icon='TRIA_UP')
@@ -242,7 +242,7 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
             root = mmd_model.Model.findRoot(active_obj)
         if root is None:
             c = self.layout.column()
-            c.label('Select a MMD Model')
+            c.label(text = 'Select a MMD Model')
             return
         rig = mmd_model.Model(root)
         root = rig.rootObject()
@@ -261,12 +261,12 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
         tb = row.column()
         tb1 = tb.column(align=True)
         if mmd_root.active_morph_type == "VTXMORPH":
-            tb1.operator(operators.morph.AddVertexMorph.bl_idname, text='', icon='ZOOMIN')   
+            tb1.operator(operators.morph.AddVertexMorph.bl_idname, text='', icon='ZOOM_IN')   
         elif mmd_root.active_morph_type == "MATMORPH":
-            tb1.operator(operators.morph.AddMaterialMorph.bl_idname, text='', icon='ZOOMIN')
+            tb1.operator(operators.morph.AddMaterialMorph.bl_idname, text='', icon='ZOOM_IN')
         elif mmd_root.active_morph_type == "BONEMORPH":
-            tb1.operator(operators.morph.AddBoneMorph.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.morph.RemoveMorph.bl_idname, text='', icon='ZOOMOUT')
+            tb1.operator(operators.morph.AddBoneMorph.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.morph.RemoveMorph.bl_idname, text='', icon='ZOOM_OUT')
         tb.separator()
         tb1 = tb.column(align=True)
         tb1.operator(operators.morph.MoveUpMorph.bl_idname, text='', icon='TRIA_UP')
@@ -297,10 +297,10 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
             break
         if meshObj is None:
             c = col.column(align=True)
-            c.label("The model mesh can't be found", icon='ERROR')
+            c.label(text = "The model mesh can't be found", icon='ERROR')
             return
         c = col.column(align=True)
-        c.label('Material Offsets')
+        c.label(text = 'Material Offsets')
         row = c.row()
         row.template_list(
             "UL_MaterialMorphOffsets", "",
@@ -309,8 +309,8 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
             )   
         tb = row.column()
         tb1 = tb.column(align=True)  
-        tb1.operator(operators.morph.AddMaterialOffset.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.morph.RemoveMaterialOffset.bl_idname, text='', icon='ZOOMOUT')
+        tb1.operator(operators.morph.AddMaterialOffset.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.morph.RemoveMaterialOffset.bl_idname, text='', icon='ZOOM_OUT')
         # tb.separator()
         # tb1 = tb.column(align=True)
         # tb1.operator(operators.morph.MoveUpMorph.bl_idname, text='', icon='TRIA_UP')
@@ -323,7 +323,7 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
         base_mat = meshObj.data.materials[data.material] # Base Material of this Offset
         if "_temp" in base_mat.name:
             c = col.column(align=True)
-            c.label('This is not a valid base material', icon='ERROR')
+            c.label(text = 'This is not a valid base material', icon='ERROR')
             return
          
         work_mat = None # Temporary material to edit this offset (and see a live preview)
@@ -342,12 +342,12 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
             row = c.row()
             row.prop(work_mat, 'diffuse_color')
             row = c.row()
-            row.label('Diffuse Alpha:')
+            row.label(text = 'Diffuse Alpha:')
             row.prop(work_mat, 'alpha')
             row = c.row()
             row.prop(work_mat, 'specular_color') 
             row = c.row()
-            row.label('Specular Alpha:')
+            row.label(text = 'Specular Alpha:')
             row.prop(work_mat, 'specular_alpha')            
             row = c.row()
             row.prop(work_mat.mmd_material, 'ambient_color')
@@ -369,10 +369,10 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
         armature = rig.armature()
         if armature is None:
             c = col.column(align=True)
-            c.label('Armature not found', icon='ERROR')
+            c.label(text = 'Armature not found', icon='ERROR')
             return
         c = col.column(align=True)
-        c.label('Bone Offsets')
+        c.label(text = 'Bone Offsets')
         row = c.row()
         row.template_list(
             "UL_BoneMorphOffsets", "",
@@ -381,8 +381,8 @@ class MMDMorphToolsPanel(_PanelBase, Panel):
             )
         tb = row.column()
         tb1 = tb.column(align=True)  
-        tb1.operator(operators.morph.AddBoneMorphOffset.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.morph.RemoveBoneMorphOffset.bl_idname, text='', icon='ZOOMOUT')
+        tb1.operator(operators.morph.AddBoneMorphOffset.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.morph.RemoveBoneMorphOffset.bl_idname, text='', icon='ZOOM_OUT')
         if len(morph.data) == 0:
             return # If the list is empty we should stop drawing the panel here
         data = morph.data[morph.active_bone_data]
@@ -441,7 +441,7 @@ class MMDRigidbodySelectorPanel(_PanelBase, Panel):
             root = mmd_model.Model.findRoot(active_obj)
         if root is None:
             c = self.layout.column()
-            c.label('Select a MMD Model')
+            c.label(text = 'Select a MMD Model')
             return
 
         rig = mmd_model.Model(root)
@@ -458,8 +458,8 @@ class MMDRigidbodySelectorPanel(_PanelBase, Panel):
             )
         tb = row.column()
         tb1 = tb.column(align=True)
-        tb1.operator(operators.rigid_body.AddRigidBody.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.rigid_body.RemoveRigidBody.bl_idname, text='', icon='ZOOMOUT')
+        tb1.operator(operators.rigid_body.AddRigidBody.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.rigid_body.RemoveRigidBody.bl_idname, text='', icon='ZOOM_OUT')
 
 
 class UL_joints(UL_ObjectsMixIn, UIList):
@@ -478,7 +478,7 @@ class MMDJointSelectorPanel(_PanelBase, Panel):
             root = mmd_model.Model.findRoot(active_obj)
         if root is None:
             c = self.layout.column()
-            c.label('Select a MMD Model')
+            c.label(text = 'Select a MMD Model')
             return
 
         rig = mmd_model.Model(root)
@@ -497,5 +497,5 @@ class MMDJointSelectorPanel(_PanelBase, Panel):
             )
         tb = row.column()
         tb1 = tb.column(align=True)
-        tb1.operator(operators.rigid_body.AddJoint.bl_idname, text='', icon='ZOOMIN')
-        tb1.operator(operators.rigid_body.RemoveJoint.bl_idname, text='', icon='ZOOMOUT')
+        tb1.operator(operators.rigid_body.AddJoint.bl_idname, text='', icon='ZOOM_IN')
+        tb1.operator(operators.rigid_body.RemoveJoint.bl_idname, text='', icon='ZOOM_OUT')
