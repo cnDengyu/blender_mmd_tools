@@ -91,19 +91,15 @@ class FileReadStream(FileStream):
 
     def readStr(self):
         length = self.readInt()
-        fmt = '<' + str(length) + 's'
-        buf, = struct.unpack(fmt, self.__fin.read(length))
-        return str(buf, self.header().encoding.charset)
+        buf, = struct.unpack('<%ds'%length, self.__fin.read(length))
+        return str(buf, self.header().encoding.charset, errors='replace')
 
     def readFloat(self):
         v, = struct.unpack('<f', self.__fin.read(4))
         return v
 
     def readVector(self, size):
-        fmt = '<'
-        for i in range(size):
-            fmt += 'f'
-        return list(struct.unpack(fmt, self.__fin.read(4*size)))
+        return struct.unpack('<'+'f'*size, self.__fin.read(4*size))
 
     def readByte(self):
         v, = struct.unpack('<B', self.__fin.read(1))
@@ -172,11 +168,7 @@ class FileWriteStream(FileStream):
         self.__fout.write(struct.pack('<f', float(v)))
 
     def writeVector(self, v):
-        l = len(v)
-        fmt = '<'
-        for i in range(l):
-            fmt += 'f'
-        self.__fout.write(struct.pack(fmt, *v))
+        self.__fout.write(struct.pack('<'+'f'*len(v), *v))
 
     def writeByte(self, v):
         self.__fout.write(struct.pack('<B', int(v)))
@@ -264,7 +256,7 @@ class Header:
         logging.info('loading pmx header information...')
         self.sign = fs.readBytes(4)
         logging.debug('File signature is %s', self.sign)
-        if self.sign != self.PMX_SIGN:
+        if self.sign[:3] != self.PMX_SIGN[:3]:
             logging.info('File signature is invalid')
             logging.error('This file is unsupported format, or corrupt file.')
             raise InvalidFileError('File signature is invalid.')
@@ -273,8 +265,8 @@ class Header:
         if self.version != self.VERSION:
             logging.error('PMX version %.1f is unsupported', self.version)
             raise UnsupportedVersionError('unsupported PMX version: %.1f'%self.version)
-        if fs.readByte() != 8:
-            raise InvalidFileError
+        if fs.readByte() != 8 or self.sign[3] != self.PMX_SIGN[3]:
+            logging.warning(' * This file might be corrupted.')
         self.encoding = Encoding(fs.readByte())
         self.additional_uvs = fs.readByte()
         self.vertex_index_size = fs.readByte()
@@ -325,6 +317,7 @@ class Header:
 
 class Model:
     def __init__(self):
+        self.filepath = ''
         self.header = None
 
         self.name = ''
@@ -348,13 +341,16 @@ class Model:
         dsp_face = Display()
         dsp_face.isSpecial = True
         dsp_face.name = '表情'
-        dsp_face.name_e = ''
+        dsp_face.name_e = 'Facial'
         self.display.append(dsp_face)
 
         self.rigids = []
         self.joints = []
 
     def load(self, fs):
+        self.filepath = fs.path()
+        self.header = fs.header()
+
         self.name = fs.readStr()
         self.name_e = fs.readStr()
 
@@ -412,7 +408,7 @@ class Model:
         self.materials = []
         for i in range(num_materials):
             m = Material()
-            m.load(fs)
+            m.load(fs, num_textures)
             self.materials.append(m)
 
             logging.info('Material %d: %s', i, m.name)
@@ -420,7 +416,8 @@ class Model:
             logging.debug('  Comment: %s', m.comment)
             logging.debug('  Vertex Count: %d', m.vertex_count)
             logging.debug('  Diffuse: (%.2f, %.2f, %.2f, %.2f)', *m.diffuse)
-            logging.debug('  Specular: (%.2f, %.2f, %.2f, %.2f)', *m.specular)
+            logging.debug('  Specular: (%.2f, %.2f, %.2f)', *m.specular)
+            logging.debug('  Shininess: %f', m.shininess)
             logging.debug('  Ambient: (%.2f, %.2f, %.2f)', *m.ambient)
             logging.debug('  Double Sided: %s', str(m.is_double_sided))
             logging.debug('  Drop Shadow: %s', str(m.enabled_drop_shadow))
@@ -456,29 +453,23 @@ class Model:
             logging.info('Bone %d: %s', i, b.name)
             logging.debug('  Name(english): %s', b.name_e)
             logging.debug('  Location: (%f, %f, %f)', *b.location)
+            logging.debug('  displayConnection: %s', str(b.displayConnection))
             logging.debug('  Parent: %s', str(b.parent))
             logging.debug('  Transform Order: %s', str(b.transform_order))
             logging.debug('  Rotatable: %s', str(b.isRotatable))
             logging.debug('  Movable: %s', str(b.isMovable))
             logging.debug('  Visible: %s', str(b.visible))
             logging.debug('  Controllable: %s', str(b.isControllable))
-            logging.debug('  Edge: %s', str(m.enabled_toon_edge))
-            logging.debug('  Additional Location: %s', str(b.hasAdditionalRotate))
+            logging.debug('  Additional Location: %s', str(b.hasAdditionalLocation))
             logging.debug('  Additional Rotation: %s', str(b.hasAdditionalRotate))
             if b.additionalTransform is not None:
                 logging.debug('  Additional Transform: Bone:%d, influence: %f', *b.additionalTransform)
             logging.debug('  IK: %s', str(b.isIK))
             if b.isIK:
+                logging.debug('    Unit Angle: %f', b.rotationConstraint)
+                logging.debug('    Target: %d', b.target)
                 for j, link in enumerate(b.ik_links):
-                    if isinstance(link.minimumAngle, list) and len(link.minimumAngle) == 3:
-                        min_str = '(%f, %f, %f)'%tuple(link.minimumAngle)
-                    else:
-                        min_str = '(None, None, None)'
-                    if isinstance(link.maximumAngle, list) and len(link.maximumAngle) == 3:
-                        max_str = '(%f, %f, %f)'%tuple(link.maximumAngle)
-                    else:
-                        max_str = '(None, None, None)'
-                    logging.debug('    IK Link %d: %d, %s - %s', j, link.target, min_str, max_str)
+                    logging.debug('    IK Link %d: %d, %s - %s', j, link.target, str(link.minimumAngle), str(link.maximumAngle))
             logging.debug('')
         logging.info('----- Loaded %d bones.', len(self.bones))
 
@@ -495,7 +486,7 @@ class Model:
 
             logging.info('%s %d: %s', m.__class__.__name__, i, m.name)
             logging.debug('  Name(english): %s', m.name_e)
-            logging.debug('  Category: %s', display_categories[m.category])
+            logging.debug('  Category: %s (%d)', display_categories.get(m.category, '#Invalid'), m.category)
             logging.debug('')
         logging.info('----- Loaded %d morphs.', len(self.morphs))
 
@@ -530,9 +521,8 @@ class Model:
             logging.info('Rigid Body %d: %s', i, r.name)
             logging.debug('  Name(english): %s', r.name_e)
             logging.debug('  Type: %s', rigid_types[r.type])
-            logging.debug('  Mode: %s', rigid_modes[r.mode])
-            if r.bone is not None:
-                logging.debug('  Related bone: %s (index: %d)', self.bones[r.bone].name, r.bone)
+            logging.debug('  Mode: %s (%d)', rigid_modes.get(r.mode, '#Invalid'), r.mode)
+            logging.debug('  Related bone: %s', r.bone)
             logging.debug('  Collision group: %d', r.collision_group_number)
             logging.debug('  Collision group mask: 0x%x', r.collision_group_mask)
             logging.debug('  Size: (%f, %f, %f)', *r.size)
@@ -558,8 +548,8 @@ class Model:
 
             logging.info('Joint %d: %s', i, j.name)
             logging.debug('  Name(english): %s', j.name_e)
-            logging.debug('  Rigid A: %s (index: %d)', self.rigids[j.src_rigid].name, j.src_rigid)
-            logging.debug('  Rigid B: %s (index: %d)', self.rigids[j.dest_rigid].name, j.dest_rigid)
+            logging.debug('  Rigid A: %s', j.src_rigid)
+            logging.debug('  Rigid B: %s', j.dest_rigid)
             logging.debug('  Location: (%f, %f, %f)', *j.location)
             logging.debug('  Rotation: (%f, %f, %f)', *j.rotation)
             logging.debug('  Location Limit: (%f, %f, %f) - (%f, %f, %f)', *(j.minimum_location + j.maximum_location))
@@ -586,70 +576,60 @@ comment(english):
 %s
 ''', self.name, self.name_e, self.comment, self.comment_e)
 
-        logging.info('exporting vertices...')
+        logging.info('exporting vertices... %d', len(self.vertices))
         fs.writeInt(len(self.vertices))
         for i in self.vertices:
             i.save(fs)
-        logging.info('the number of vetices: %d', len(self.vertices))
         logging.info('finished exporting vertices.')
 
-        logging.info('exporting faces...')
+        logging.info('exporting faces... %d', len(self.faces))
         fs.writeInt(len(self.faces)*3)
         for f3, f2, f1 in self.faces:
             fs.writeVertexIndex(f1)
             fs.writeVertexIndex(f2)
             fs.writeVertexIndex(f3)
-        logging.info('the number of faces: %d', len(self.faces))
         logging.info('finished exporting faces.')
 
-        logging.info('exporting textures...')
+        logging.info('exporting textures... %d', len(self.textures))
         fs.writeInt(len(self.textures))
         for i in self.textures:
             i.save(fs)
-        logging.info('the number of textures: %d', len(self.textures))
         logging.info('finished exporting textures.')
 
-        logging.info('exporting materials...')
+        logging.info('exporting materials... %d', len(self.materials))
         fs.writeInt(len(self.materials))
         for i in self.materials:
             i.save(fs)
-        logging.info('the number of materials: %d', len(self.materials))
         logging.info('finished exporting materials.')
 
-        logging.info('exporting bones...')
+        logging.info('exporting bones... %d', len(self.bones))
         fs.writeInt(len(self.bones))
         for i in self.bones:
             i.save(fs)
-        logging.info('the number of bones: %d', len(self.bones))
         logging.info('finished exporting bones.')
 
-        logging.info('exporting morphs...')
+        logging.info('exporting morphs... %d', len(self.morphs))
         fs.writeInt(len(self.morphs))
         for i in self.morphs:
             i.save(fs)
-        logging.info('the number of morphs: %d', len(self.morphs))
         logging.info('finished exporting morphs.')
 
-        logging.info('exporting display items...')
+        logging.info('exporting display items... %d', len(self.display))
         fs.writeInt(len(self.display))
         for i in self.display:
             i.save(fs)
-        logging.info('the number of display items: %d', len(self.display))
         logging.info('finished exporting display items.')
 
-        logging.info('exporting rigid bodies...')
+        logging.info('exporting rigid bodies... %d', len(self.rigids))
         fs.writeInt(len(self.rigids))
         for i in self.rigids:
-            logging.debug('  Rigid: %s', i.name)
             i.save(fs)
-        logging.info('the number of rigid bodies: %d', len(self.rigids))
         logging.info('finished exporting rigid bodies.')
 
-        logging.info('exporting joints...')
+        logging.info('exporting joints... %d', len(self.joints))
         fs.writeInt(len(self.joints))
         for i in self.joints:
             i.save(fs)
-        logging.info('the number of joints: %d', len(self.joints))
         logging.info('finished exporting joints.')
         logging.info('finished exporting the model.')
 
@@ -699,6 +679,8 @@ class Vertex:
         fs.writeVector(self.uv)
         for i in self.additional_uvs:
             fs.writeVector(i)
+        for i in range(fs.header().additional_uvs-len(self.additional_uvs)):
+            fs.writeVector((0,0,0,0))
         self.weight.save(fs)
         fs.writeFloat(self.edge_scale)
 
@@ -804,11 +786,18 @@ class Texture:
 
     def load(self, fs):
         self.path = fs.readStr()
+        self.path = self.path.replace('\\', os.path.sep)
         if not os.path.isabs(self.path):
             self.path = os.path.normpath(os.path.join(os.path.dirname(fs.path()), self.path))
 
     def save(self, fs):
-        fs.writeStr(os.path.relpath(self.path, os.path.dirname(fs.path())))
+        try:
+            relPath = os.path.relpath(self.path, os.path.dirname(fs.path()))
+        except ValueError:
+            relPath = self.path
+        relPath = relPath.replace(os.path.sep, '\\') # always save using windows path conventions
+        logging.info('writing to pmx file the relative texture path: %s', relPath)
+        fs.writeStr(relPath)
 
 class SharedTexture(Texture):
     def __init__(self):
@@ -827,12 +816,13 @@ class Material:
 
         self.diffuse = []
         self.specular = []
+        self.shininess = 0
         self.ambient = []
 
-        self.is_double_sided = False
-        self.enabled_drop_shadow = False
-        self.enabled_self_shadow_map = False
-        self.enabled_self_shadow = False
+        self.is_double_sided = True
+        self.enabled_drop_shadow = True
+        self.enabled_self_shadow_map = True
+        self.enabled_self_shadow = True
         self.enabled_toon_edge = False
 
         self.edge_color = []
@@ -848,11 +838,12 @@ class Material:
         self.vertex_count = 0
 
     def __repr__(self):
-        return '<Material name %s, name_e %s, diffuse %s, specular %s, ambient %s, double_side %s, drop_shadow %s, self_shadow_map %s, self_shadow %s, toon_edge %s, edge_color %s, edge_size %s, toon_texture %s, comment %s>'%(
+        return '<Material name %s, name_e %s, diffuse %s, specular %s, shininess %s, ambient %s, double_side %s, drop_shadow %s, self_shadow_map %s, self_shadow %s, toon_edge %s, edge_color %s, edge_size %s, toon_texture %s, comment %s>'%(
             self.name,
             self.name_e,
             str(self.diffuse),
             str(self.specular),
+            str(self.shininess),
             str(self.ambient),
             str(self.is_double_sided),
             str(self.enabled_drop_shadow),
@@ -866,12 +857,16 @@ class Material:
             str(self.toon_texture),
             str(self.comment),)
 
-    def load(self, fs):
+    def load(self, fs, num_textures):
+        def __tex_index(index):
+            return index if 0 <= index < num_textures else -1
+
         self.name = fs.readStr()
         self.name_e = fs.readStr()
 
         self.diffuse = fs.readVector(4)
-        self.specular = fs.readVector(4)
+        self.specular = fs.readVector(3)
+        self.shininess = fs.readFloat()
         self.ambient = fs.readVector(3)
 
         flags = fs.readByte()
@@ -884,8 +879,8 @@ class Material:
         self.edge_color = fs.readVector(4)
         self.edge_size = fs.readFloat()
 
-        self.texture = fs.readTextureIndex()
-        self.sphere_texture = fs.readTextureIndex()
+        self.texture = __tex_index(fs.readTextureIndex())
+        self.sphere_texture = __tex_index(fs.readTextureIndex())
         self.sphere_texture_mode = fs.readSignedByte()
 
         self.is_shared_toon_texture = fs.readSignedByte()
@@ -893,17 +888,18 @@ class Material:
         if self.is_shared_toon_texture:
             self.toon_texture = fs.readSignedByte()
         else:
-            self.toon_texture = fs.readTextureIndex()
+            self.toon_texture = __tex_index(fs.readTextureIndex())
 
         self.comment = fs.readStr()
         self.vertex_count = fs.readInt()
 
     def save(self, fs):
         fs.writeStr(self.name)
-        fs.writeStr(self.name)
+        fs.writeStr(self.name_e)
 
         fs.writeVector(self.diffuse)
         fs.writeVector(self.specular)
+        fs.writeFloat(self.shininess)
         fs.writeVector(self.ambient)
 
         flags = 0
@@ -1070,6 +1066,7 @@ class Bone:
         flags |= int(self.axis is not None) << 10
         flags |= int(self.localCoordinate is not None) << 11
 
+        flags |= int(self.transAfterPhis) << 12
         flags |= int(self.externalTransKey is not None) << 13
 
         fs.writeShort(flags)
@@ -1124,7 +1121,7 @@ class IKLink:
 
     def save(self, fs):
         fs.writeBoneIndex(self.target)
-        if isinstance(self.minimumAngle, list) and isinstance(self.maximumAngle, list):
+        if isinstance(self.minimumAngle, (tuple, list)) and isinstance(self.maximumAngle, (tuple, list)):
             fs.writeByte(1)
             fs.writeVector(self.minimumAngle)
             fs.writeVector(self.maximumAngle)
@@ -1268,6 +1265,8 @@ class BoneMorphOffset:
         self.index = fs.readBoneIndex()
         self.location_offset = fs.readVector(3)
         self.rotation_offset = fs.readVector(4)
+        if not any(self.rotation_offset):
+            self.rotation_offset = (0, 0, 0, 1)
 
     def save(self, fs):
         fs.writeBoneIndex(self.index)
@@ -1298,6 +1297,7 @@ class MaterialMorphOffset:
         self.offset_type = 0
         self.diffuse_offset = []
         self.specular_offset = []
+        self.shininess_offset = 0
         self.ambient_offset = []
         self.edge_color_offset = []
         self.edge_size_offset = []
@@ -1309,7 +1309,8 @@ class MaterialMorphOffset:
         self.index = fs.readMaterialIndex()
         self.offset_type = fs.readSignedByte()
         self.diffuse_offset = fs.readVector(4)
-        self.specular_offset = fs.readVector(4)
+        self.specular_offset = fs.readVector(3)
+        self.shininess_offset = fs.readFloat()
         self.ambient_offset = fs.readVector(3)
         self.edge_color_offset = fs.readVector(4)
         self.edge_size_offset = fs.readFloat()
@@ -1322,6 +1323,7 @@ class MaterialMorphOffset:
         fs.writeSignedByte(self.offset_type)
         fs.writeVector(self.diffuse_offset)
         fs.writeVector(self.specular_offset)
+        fs.writeFloat(self.shininess_offset)
         fs.writeVector(self.ambient_offset)
         fs.writeVector(self.edge_color_offset)
         fs.writeFloat(self.edge_size_offset)
@@ -1520,6 +1522,19 @@ class Joint:
         self.spring_rotation_constant = []
 
     def load(self, fs):
+        try: self._load(fs)
+        except struct.error: # possibly contains truncated data
+            if self.src_rigid is None or self.dest_rigid is None: raise
+            self.location = self.location or (0, 0, 0)
+            self.rotation = self.rotation or (0, 0, 0)
+            self.maximum_location = self.maximum_location or (0, 0, 0)
+            self.minimum_location = self.minimum_location or (0, 0, 0)
+            self.maximum_rotation = self.maximum_rotation or (0, 0, 0)
+            self.minimum_rotation = self.minimum_rotation or (0, 0, 0)
+            self.spring_constant = self.spring_constant or (0, 0, 0)
+            self.spring_rotation_constant = self.spring_rotation_constant or (0, 0, 0)
+
+    def _load(self, fs):
         self.name = fs.readStr()
         self.name_e = fs.readStr()
 
@@ -1583,16 +1598,21 @@ def load(path):
         header.load(fs)
         fs.setHeader(header)
         model = Model()
-        model.load(fs)
+        try:
+            model.load(fs)
+        except struct.error as e:
+            logging.error(' * Corrupted file: %s', e)
+            #raise
         logging.info(' Finished loading.')
         logging.info('----------------------------------------')
         logging.info(' mmd_tools.pmx module')
         logging.info('****************************************')
         return model
 
-def save(path, model):
+def save(path, model, add_uv_count=0):
     with FileWriteStream(path) as fs:
         header = Header(model)
+        header.additional_uvs = max(0, min(4, add_uv_count)) # UV1~UV4
         header.save(fs)
         fs.setHeader(header)
         model.save(fs)

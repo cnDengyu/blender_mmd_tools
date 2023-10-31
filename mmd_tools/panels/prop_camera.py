@@ -2,8 +2,10 @@
 
 from bpy.types import Panel
 
-import mmd_tools.core.camera as mmd_camera
+from mmd_tools import register_wrap
+from mmd_tools.core.camera import MMDCamera
 
+@register_wrap
 class MMDCameraPanel(Panel):
     bl_idname = 'OBJECT_PT_mmd_tools_camera'
     bl_label = 'MMD Camera Tools'
@@ -14,19 +16,19 @@ class MMDCameraPanel(Panel):
     @classmethod
     def poll(cls, context):
         obj = context.active_object
-        return obj is not None and (obj.type == 'CAMERA' or mmd_camera.MMDCamera.isMMDCamera(obj))
+        return obj and (obj.type == 'CAMERA' or MMDCamera.isMMDCamera(obj))
 
     def draw(self, context):
         obj = context.active_object
 
         layout = self.layout
 
-        if mmd_camera.MMDCamera.isMMDCamera(obj):
-            mmd_cam = mmd_camera.MMDCamera(obj)
+        if MMDCamera.isMMDCamera(obj):
+            mmd_cam = MMDCamera(obj)
             empty = mmd_cam.object()
             camera = mmd_cam.camera()
 
-            row = layout.row(align=True)
+            row = layout.row()
 
             c = row.column()
             c.prop(empty, 'location')
@@ -35,13 +37,7 @@ class MMDCameraPanel(Panel):
             c = row.column()
             c.prop(empty, 'rotation_euler')
 
-            row = layout.row(align=True)
-            row.prop(empty.mmd_camera, 'angle')
-            row = layout.row(align=True)
-            row.prop(empty.mmd_camera, 'is_perspective')
+            layout.prop(empty.mmd_camera, 'angle')
+            layout.prop(empty.mmd_camera, 'is_perspective')
         else:
-            col = layout.column(align=True)
-
-            c = col.column()
-            r = c.row()
-            r.operator('mmd_tools.convert_to_mmd_camera', 'Convert')
+            layout.operator('mmd_tools.convert_to_mmd_camera', text='Convert')

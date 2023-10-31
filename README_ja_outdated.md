@@ -1,54 +1,58 @@
 mmd_tools
 ===========
 
-About
+概要
 ----
-mmd_tools is a blender import addon for importing MMD (MikuMikuDance) model data (.pmd, .pmx) and motion data (.vmd)
+mmd_toolsはblender用MMD(MikuMikuDance)モデルデータ(.pmd, .pmx)およびモーションデータ(.vmd)インポータです。
 
+### 環境
 
-### Environment
+#### 対応バージョン
+blender 2.67以降
 
-#### Compatible Version
-blender 2.67 and later
-
-#### Tested working environments
+#### 動作確認環境
 Windows 7 + blender 2.67 64bit
 
-OSX + blender 2.67 64bit
 
-Ubuntu + blender 2.67 64bit
+注意
+----
+
+現在のmasterブランチは、v0.5.0向け開発バージョンです。
+
+旧バージョンv0.4系列のバグ修正等はメンテナンスブランチ [0.4-main](https://github.com/sugiany/blender_mmd_tools/tree/0.4-main) で行います。
+
+また、UIや使用方法が変わっているため、注意してください。
 
 
-Usage
+使用方法
 ---------
-### Download
+### ダウンロード
 
-* download mmd_tools from our github repository.
+* mmd_toolsはGitHubで公開しています。
     * https://github.com/sugiany/blender_mmd_tools
-* Stable release can be found in the link below.
+* 安定版は下記リンクから最新版をダウンロードしてください。
     * [Tags](https://github.com/sugiany/blender_mmd_tools/tags)
-* Nightly release can be downloaded from the master, only basic functionality is tested working.
+* 開発版はmasterブランチのHEADを取得してください。基本的に動作確認済みです。
     * [master.zip](https://github.com/sugiany/blender_mmd_tools/archive/master.zip)
 
-### Install
-Extract the archive and put the folder mmd__tools into the addon folder of blender.
+### インストール
+展開したアーカイブ内のmmd_toolsディレクトリをaddonディレクトリにコピーしてください。
 
     .../blender-2.67-windows64/2.67/scripts/addons/
 
-### Loading Addon
-1. In User Preferences, under addon tab, select User filter and click the checkbox before mmd_tools
-   (you can also find the addon my search)
-2. After installation, you can find the panel called MMD on the left of 3D view
+### Addonのロード
+1. User PrefernceのAddonsから"Object: mmd_tools"探してチェックを入れてください。
+   (検索ボックスにmmdと入力すると簡単に探せます。)
+2. 3D View左のパネルにMMD Toolsのパネルが表示されます。
 
 ### MMDモデルデータ読み込み
-1. mmd_toolsパネルの"import/Model"ボタンを選択してください。
+1. _Object_ パネルの"Model/Import"ボタンを選択してください。
 2. ファイル選択画面でpmxファイルを選択すると、選択されたモデルをインポートします。
 
 ### モーションデータの読み込み
-1. あらかじめ読み込んでおいたモデルのMeshとArmature、Cameraを選択してください。(選択していない項目はインポートされません)
-2. mmd_toolsパネルの"import/Motion"ボタンを選択してください。
-3. ファイル選択画面でvmdファイルを選択すると選択中のオブジェクトへモーションをインポートします。
-4. 「update scene settings」チェックボックスをオンにしておくと、モーションの読み込み後にフレームレンジ等のシーン設定を自動更新します。
+1. MMDモデルを読み込み、モデルのメッシュ等を選択してください。
+2. _MMD Model Tools_ パネル内の _Import Motion_ ボタンを押下してください。
+3. 剛体シミュレーションが必要な場合は、 同パネル内の _Build_ ボタンを押下してください。
 
 
 各種機能詳細
@@ -159,18 +163,18 @@ GLSLボタンで変更した内容を初期状態に戻します。
     * 現状、解決が難しいため、オブジェクトモードでの移動操作は行わないことをおすすめします。
 
 
-Bug・Request・Questions etc.
+バグ・要望・質問等
 ------------------
-Please submit a GitHub issue or contact me using twitter 
+GitHubのIssueに登録するか、twitterでどうぞ。  
 [@sugiany](https://twitter.com/sugiany)
 
 
-Changelog
+変更履歴
 --------
-Please refer to CHANGELOG.md
+CHANGELOG.mdを参照してください。
 
 
-License
+ライセンス
 ----------
 &copy; 2012-2014 sugiany  
 Distributed under the MIT License.  

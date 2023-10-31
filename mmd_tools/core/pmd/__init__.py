@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import struct
+import os
 import re
 import logging
 import collections
@@ -64,28 +65,16 @@ class  FileReadStream(FileStream):
 
     def readStr(self, size):
         buf = self.__fin.read(size)
-        try:
-            index = buf.index(b'\x00')
-            t = buf[:index]
-            return t.decode('shift-jis')
-        except ValueError:
-            if buf[0] == b'\xfd':
-                return ''
-            try:
-                return buf.decode('shift-jis')
-            except UnicodeDecodeError:
-                logging.warning('found a invalid shift-jis string.')
-                return ''
+        if buf[0] == b'\xfd':
+            return ''
+        return buf.split(b'\x00')[0].decode('shift_jis', errors='replace')
 
     def readFloat(self):
         v, = struct.unpack('<f', self.__fin.read(4))
         return v
 
     def readVector(self, size):
-        fmt = '<'
-        for i in range(size):
-            fmt += 'f'
-        return list(struct.unpack(fmt, self.__fin.read(4*size)))
+        return struct.unpack('<'+'f'*size, self.__fin.read(4*size))
 
     def readByte(self):
         v, = struct.unpack('<B', self.__fin.read(1))
@@ -141,7 +130,7 @@ class Vertex:
 class Material:
     def __init__(self):
         self.diffuse = []
-        self.specular_intensity = 0.5
+        self.shininess = 0
         self.specular = []
         self.ambient = []
         self.toon_index = 0
@@ -153,13 +142,14 @@ class Material:
 
     def load(self, fs):
         self.diffuse = fs.readVector(4)
-        self.specular_intensity = fs.readFloat()
+        self.shininess = fs.readFloat()
         self.specular = fs.readVector(3)
         self.ambient = fs.readVector(3)
-        self.toon_index = fs.readByte()
+        self.toon_index = fs.readSignedByte()
         self.edge_flag = fs.readByte()
         self.vertex_count = fs.readUnsignedInt()
         tex_path = fs.readStr(20)
+        tex_path = tex_path.replace('\\', os.path.sep)
         t = tex_path.split('*')
         if not re.search(r'\.sp([ha])$', t[0], flags=re.I):
             self.texture_path = t.pop(0)
@@ -187,7 +177,10 @@ class Bone:
         if self.tail_bone == 0xffff:
             self.tail_bone = -1
         self.type = fs.readByte()
-        self.ik_bone = fs.readUnsignedShort()
+        if self.type == 9:
+            self.ik_bone = fs.readShort()
+        else:
+            self.ik_bone = fs.readUnsignedShort()
         self.position = fs.readVector(3)
 
 class IK:
@@ -281,8 +274,8 @@ class RigidBody:
 class Joint:
     def __init__(self):
         self.name = ''
-        self.src_rigid = 0
-        self.dest_rigid = 0
+        self.src_rigid = None
+        self.dest_rigid = None
 
         self.location = []
         self.rotation = []
@@ -296,6 +289,19 @@ class Joint:
         self.spring_rotation_constant = []
 
     def load(self, fs):
+        try: self._load(fs)
+        except struct.error: # possibly contains truncated data
+            if self.src_rigid is None or self.dest_rigid is None: raise
+            self.location = self.location or (0, 0, 0)
+            self.rotation = self.rotation or (0, 0, 0)
+            self.maximum_location = self.maximum_location or (0, 0, 0)
+            self.minimum_location = self.minimum_location or (0, 0, 0)
+            self.maximum_rotation = self.maximum_rotation or (0, 0, 0)
+            self.minimum_rotation = self.minimum_rotation or (0, 0, 0)
+            self.spring_constant = self.spring_constant or (0, 0, 0)
+            self.spring_rotation_constant = self.spring_rotation_constant or (0, 0, 0)
+
+    def _load(self, fs):
         self.name = fs.readStr(20)
 
         self.src_rigid = fs.readUnsignedInt()
@@ -304,10 +310,10 @@ class Joint:
         self.location = fs.readVector(3)
         self.rotation = fs.readVector(3)
 
-        self.maximum_location = fs.readVector(3)
         self.minimum_location = fs.readVector(3)
-        self.maximum_rotation = fs.readVector(3)
+        self.maximum_location = fs.readVector(3)
         self.minimum_rotation = fs.readVector(3)
+        self.maximum_rotation = fs.readVector(3)
 
         self.spring_constant = fs.readVector(3)
         self.spring_rotation_constant = fs.readVector(3)
@@ -386,7 +392,7 @@ class Model:
             logging.debug('  Vertex Count: %d', mat.vertex_count)
             logging.debug('  Diffuse: (%.2f, %.2f, %.2f, %.2f)', *mat.diffuse)
             logging.debug('  Specular: (%.2f, %.2f, %.2f)', *mat.specular)
-            logging.debug('  Specular Intensity: %f', mat.specular_intensity)
+            logging.debug('  Shininess: %f', mat.shininess)
             logging.debug('  Ambient: (%.2f, %.2f, %.2f)', *mat.ambient)
             logging.debug('  Toon Index: %d', mat.toon_index)
             logging.debug('  Edge Type: %d', mat.edge_flag)
@@ -449,7 +455,7 @@ class Model:
             morph.load(fs)
             self.morphs.append(morph)
             logging.info('Vertex Morph %d: %s', i, morph.name)
-        logging.info('----- Loaded %d materials', len(self.morphs))
+        logging.info('----- Loaded %d morphs', len(self.morphs))
 
         logging.info('')
         logging.info('------------------------------')
@@ -469,6 +475,7 @@ class Model:
             name = fs.readStr(50)
             self.bone_disp_lists[name] = []
             bone_disps.append(name)
+        self.bone_disp_names = [bone_disps, None]
 
         t = fs.readUnsignedInt()
         for i in range(t):
@@ -519,6 +526,7 @@ class Model:
                 t = fs.readStr(50)
                 bone_disps_e.append(t)
                 logging.info(' Bone name(english) %d: %s', i, t)
+            self.bone_disp_names[1] = bone_disps_e
         logging.info('----- Loaded english data.')
 
         logging.info('')
@@ -528,6 +536,7 @@ class Model:
         self.toon_textures = []
         for i in range(10):
             t = fs.readStr(100)
+            t = t.replace('\\', os.path.sep)
             self.toon_textures.append(t)
             logging.info('Toon Texture %d: %s', i, t)
         logging.info('----- Loaded %d textures', len(self.toon_textures))
@@ -536,7 +545,12 @@ class Model:
         logging.info('------------------------------')
         logging.info(' Load Rigid Bodies')
         logging.info('------------------------------')
-        rigid_count = fs.readUnsignedInt()
+        try:
+            rigid_count = fs.readUnsignedInt()
+        except struct.error:
+            logging.info('no physics data')
+            logging.info('===============================')
+            return
         self.rigid_bodies = []
         for i in range(rigid_count):
             rigid = RigidBody()
@@ -566,8 +580,8 @@ class Model:
             joint.load(fs)
             self.joints.append(joint)
             logging.info('Joint %d: %s', i, joint.name)
-            logging.debug('  Rigid A: %s (index: %d)', self.rigid_bodies[joint.src_rigid].name, joint.src_rigid)
-            logging.debug('  Rigid B: %s (index: %d)', self.rigid_bodies[joint.dest_rigid].name, joint.dest_rigid)
+            logging.debug('  Rigid A: %s', joint.src_rigid)
+            logging.debug('  Rigid B: %s', joint.dest_rigid)
             logging.debug('  Location: (%f, %f, %f)', *joint.location)
             logging.debug('  Rotation: (%f, %f, %f)', *joint.rotation)
             logging.debug('  Location Limit: (%f, %f, %f) - (%f, %f, %f)', *(joint.minimum_location + joint.maximum_location))
@@ -589,7 +603,11 @@ def load(path):
         logging.info('')
 
         model = Model()
-        model.load(fs)
+        try:
+            model.load(fs)
+        except struct.error as e:
+            logging.error(' * Corrupted file: %s', e)
+            #raise
 
         logging.info(' Finish loading.')
         logging.info('----------------------------------------')
