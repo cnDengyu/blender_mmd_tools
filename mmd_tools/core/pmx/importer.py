@@ -1,18 +1,16 @@
 # -*- coding: utf-8 -*-
-import os
 import collections
 import logging
+import os
 import time
 
 import bpy
-from mathutils import Vector, Matrix
-
-import mmd_tools.core.model as mmd_model
-from mmd_tools import utils
-from mmd_tools import bpyutils
+from mathutils import Matrix, Vector
+from mmd_tools import bpyutils, utils
 from mmd_tools.core import pmx
 from mmd_tools.core.bone import FnBone
 from mmd_tools.core.material import FnMaterial
+from mmd_tools.core.model import FnModel, Model
 from mmd_tools.core.morph import FnMorph
 from mmd_tools.core.vmd.importer import BoneConverter
 from mmd_tools.operators.display_item import DisplayItemQuickSetup
@@ -76,7 +74,7 @@ class PMXImporter:
         """
         pmxModel = self.__model
         obj_name = self.__safe_name(bpy.path.display_name(pmxModel.filepath), max_length=54)
-        self.__rig = mmd_model.Model.create(pmxModel.name, pmxModel.name_e, self.__scale, obj_name)
+        self.__rig = Model.create(pmxModel.name, pmxModel.name_e, self.__scale, obj_name)
         root = self.__rig.rootObject()
         mmd_root = root.mmd_root
         self.__root = root
@@ -269,14 +267,14 @@ class PMXImporter:
                 if isinstance(m_bone.displayConnection, int) and m_bone.displayConnection >= 0:
                     t = editBoneTable[m_bone.displayConnection]
                     if t.parent is None or t.parent != b_bone:
-                        logging.warning(' * disconnected: %s (%d)<> %s', b_bone.name, len(b_bone.children), t.name)
                         continue
                     if pmx_bones[m_bone.displayConnection].isMovable:
-                        logging.warning(' * disconnected: %s (%d)-> %s', b_bone.name, len(b_bone.children), t.name)
                         continue
                     if (b_bone.tail - t.head).length > 1e-4:
-                        logging.warning(' * disconnected: %s (%d)=> %s', b_bone.name, len(b_bone.children), t.name)
                         continue
+                    if not m_bone.isMovable:
+                        continue
+                    logging.warning(' * connected: %s (%d)-> %s', b_bone.name, len(b_bone.children), t.name)
                     t.use_connect = True
 
         return nameTable, specialTipBones
@@ -403,7 +401,7 @@ class PMXImporter:
                 c = bone.constraints.new(type='LIMIT_ROTATION')
                 c.mute = not is_valid_ik
                 c.name = 'mmd_ik_limit_override'
-                c.owner_space = 'POSE' # WORLD/POSE/LOCAL
+                c.owner_space = 'LOCAL'
                 c.max_x, c.max_y, c.max_z = maximum
                 c.min_x, c.min_y, c.min_z = minimum
                 c.use_limit_x = bone.ik_max_x != c.max_x or bone.ik_min_x != c.min_x
@@ -637,19 +635,26 @@ class PMXImporter:
         # For Cycles, users have to offset or delete those z-fighting faces to fix it manually.
         check = {}
         mi_skip = -1
-        def _rounded_co(co): return tuple(round(v, 6) for v in co)
+        _vi_cache = {}
+        def _rounded_co_vi(vi):
+            if vi not in _vi_cache:
+                vco = vertices[vi].co
+                _vi_cache[vi] = (round(vco[0], 6), round(vco[1], 6), round(vco[2], 6))
+            return _vi_cache[vi]
+
         assert(len(loop_indices) == len(material_indices)*3)
         for i, mi in enumerate(material_indices):
-            if mi > mi_skip:
-                si = 3*i
-                verts = tuple(sorted(_rounded_co(vertices[vi].co) for vi in loop_indices[si:si+3]))
-                if verts not in check:
-                    check[verts] = mi
-                elif check[verts] < mi:
-                    logging.debug(' >> fix blend method of material: %s', materials[mi].name)
-                    materials[mi].blend_method = 'BLEND'
-                    materials[mi].show_transparent_back = False
-                    mi_skip = mi
+            if mi <= mi_skip:
+                continue
+            si = 3*i
+            verts = tuple(sorted((_rounded_co_vi(loop_indices[si]), _rounded_co_vi(loop_indices[si+1]), _rounded_co_vi(loop_indices[si+2]))))
+            if verts not in check:
+                check[verts] = mi
+            elif check[verts] < mi:
+                logging.debug(' >> fix blend method of material: %s', materials[mi].name)
+                materials[mi].blend_method = 'BLEND'
+                materials[mi].show_transparent_back = False
+                mi_skip = mi
 
     def __importVertexMorphs(self):
         mmd_root = self.__root.mmd_root
@@ -768,6 +773,7 @@ class PMXImporter:
         DisplayItemQuickSetup.apply_bone_groups(root.mmd_root, self.__armObj)
 
     def __addArmatureModifier(self, meshObj, armObj):
+        # TODO: move to model.py
         armModifier = meshObj.modifiers.new(name='Armature', type='ARMATURE')
         armModifier.object = armObj
         armModifier.use_vertex_groups = True
@@ -883,6 +889,7 @@ class PMXImporter:
         if self.__meshObj:
             self.__addArmatureModifier(self.__meshObj, self.__armObj)
 
+        FnModel.change_mmd_ik_loop_factor(self.__root, args.get('ik_loop_factor', 1))
         #bpy.context.scene.gravity[2] = -9.81 * 10 * self.__scale
         self.__targetScene.active_object = self.__root
 

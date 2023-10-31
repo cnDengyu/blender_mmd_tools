@@ -1,8 +1,11 @@
 Original author
 - sugiany
 
-Maintainer
+Former Maintainer
 - powroupi
+
+Maintainer
+- UuuNyaa
 
 Contributors
 - iRi-E

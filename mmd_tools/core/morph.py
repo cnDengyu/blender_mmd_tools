@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
+import logging
 import re
 
 import bpy
 from mmd_tools import bpyutils
-from mmd_tools.bpyutils import SceneOp
-from mmd_tools.bpyutils import ObjectOp
-from mmd_tools.bpyutils import TransformConstraintOp
+from mmd_tools.bpyutils import ObjectOp, SceneOp, TransformConstraintOp
+
 
 class FnMorph(object):
 
@@ -133,6 +133,39 @@ class FnMorph(object):
             obj.vertex_groups.active.name = vg_name.replace(src_name, dest_name)
 
     @staticmethod
+    def overwrite_bone_morphs_from_pose_library(armature_object):
+        armature = armature_object.id_data
+        pose_library = armature.pose_library
+
+        if pose_library is None:
+            return
+
+        root = armature_object.parent
+        mmd_root = root.mmd_root
+        bone_morphs = mmd_root.bone_morphs
+
+        original_mode = bpy.context.object.mode
+        bpy.ops.object.mode_set(mode='POSE')
+        try:
+            for index, pose_maker in enumerate(pose_library.pose_markers):
+                bone_morph = next(iter([m for m in bone_morphs if m.name == pose_maker.name]), None)
+                if bone_morph is None:
+                    bone_morph = bone_morphs.add()
+                    bone_morph.name = pose_maker.name
+
+                bpy.ops.pose.select_all(action='SELECT')
+                bpy.ops.pose.transforms_clear()
+                bpy.ops.poselib.apply_pose(pose_index=index)
+
+                mmd_root.active_morph = bone_morphs.find(bone_morph.name)
+                bpy.ops.mmd_tools.apply_bone_morph()
+
+            bpy.ops.pose.transforms_clear()
+
+        finally:
+            bpy.ops.object.mode_set(mode=original_mode)
+
+    @staticmethod
     def clean_uv_morph_vertex_groups(obj):
         # remove empty vertex groups of uv morphs
         vg_indices = {g.index for g, n, x in FnMorph.get_uv_morph_vertex_groups(obj)}
@@ -215,6 +248,56 @@ class FnMorph(object):
             if meshObj is not None:
                 offset.related_mesh = meshObj.data.name
 
+    @staticmethod
+    def clean_duplicated_material_morphs(mmd_root_object: bpy.types.Object):
+        """Clean duplicated material_morphs and data from mmd_root_object.mmd_root.material_morphs[].data[]
+        """
+        mmd_root = mmd_root_object.mmd_root
+
+        def morph_data_equals(l, r) -> bool:
+            return (l.related_mesh_data == r.related_mesh_data
+                and l.offset_type == r.offset_type
+                and l.material == r.material
+                and all(a == b for a, b in zip(l.diffuse_color, r.diffuse_color))
+                and all(a == b for a, b in zip(l.specular_color, r.specular_color))
+                and l.shininess == r.shininess
+                and all(a == b for a, b in zip(l.ambient_color, r.ambient_color))
+                and all(a == b for a, b in zip(l.edge_color, r.edge_color))
+                and l.edge_weight == r.edge_weight
+                and all(a == b for a, b in zip(l.texture_factor, r.texture_factor))
+                and all(a == b for a, b in zip(l.sphere_texture_factor, r.sphere_texture_factor))
+                and all(a == b for a, b in zip(l.toon_texture_factor, r.toon_texture_factor))
+            )
+
+        def morph_equals(l, r) -> bool:
+            return len(l.data) == len(r.data) and all(morph_data_equals(a, b) for a, b in zip(l.data, r.data))
+
+        # Remove duplicated mmd_root.material_morphs.data[]
+        for material_morph in mmd_root.material_morphs:
+            save_materil_morph_datas = []
+            remove_material_morph_data_indices = []
+            for index, material_morph_data in enumerate(material_morph.data):
+                if any(morph_data_equals(material_morph_data, saved_material_morph_data) for saved_material_morph_data in save_materil_morph_datas):
+                    remove_material_morph_data_indices.append(index)
+                    continue
+                save_materil_morph_datas.append(material_morph_data)
+
+            for index in reversed(remove_material_morph_data_indices):
+                material_morph.data.remove(index)
+
+        # Mark duplicated mmd_root.material_morphs[]
+        save_material_morphs = []
+        remove_material_morph_names = []
+        for material_morph in sorted(mmd_root.material_morphs, key=lambda m: m.name):
+            if any(morph_equals(material_morph, saved_material_morph) for saved_material_morph in save_material_morphs):
+                remove_material_morph_names.append(material_morph.name)
+                continue
+
+            save_material_morphs.append(material_morph)
+
+        # Remove marked mmd_root.material_morphs[]
+        for material_morph_name in remove_material_morph_names:
+            mmd_root.material_morphs.remove(mmd_root.material_morphs.find(material_morph_name))
 
 class _MorphSlider:
 
@@ -290,7 +373,7 @@ class _MorphSlider:
     @staticmethod
     def __add_single_prop(variables, id_obj, data_path, prefix):
         var = variables.new()
-        var.name = prefix + str(len(variables))
+        var.name = f'{prefix}{len(variables)}'
         var.type = 'SINGLE_PROP'
         target = var.targets[0]
         target.id_type = 'OBJECT'
@@ -314,7 +397,7 @@ class _MorphSlider:
         return (not d or d.driver.expression == ''.join(('*w','+g','v')[-1 if i < 1 else i%2]+str(i+1) for i in range(len(d.driver.variables))))
 
     def __cleanup(self, names_in_use=None):
-        from math import floor, ceil
+        from math import ceil, floor
         names_in_use = names_in_use or {}
         rig = self.__rig
         morph_sliders = self.placeholder()
@@ -355,6 +438,10 @@ class _MorphSlider:
 
     def unbind(self):
         mmd_root = self.__rig.rootObject().mmd_root
+
+        # after unbind, the weird lag problem will disappear.
+        mmd_root.morph_panel_show_settings = True
+
         for m in mmd_root.bone_morphs:
             for d in m.data:
                 d.name = ''
@@ -377,6 +464,9 @@ class _MorphSlider:
         root = rig.rootObject()
         armObj = rig.armature()
         mmd_root = root.mmd_root
+
+        # hide detail to avoid weird lag problem
+        mmd_root.morph_panel_show_settings = False
 
         obj = self.create()
         arm = self.__dummy_armature(obj, create=True)
@@ -486,12 +576,13 @@ class _MorphSlider:
             material_offset_map.setdefault('group_dict', {})[m.name] = (data_path, groups)
             for d in m.data:
                 d.name = name_bind = 'mmd_bind%s'%hash(d)
-                table = material_offset_map.setdefault(d.material_id, ([], []))
+                # add '#' before material name to avoid conflict with group_dict
+                table = material_offset_map.setdefault('#'+d.material, ([], []))
                 table[1 if d.offset_type == 'ADD' else 0].append((m.name, d, name_bind))
 
         for m in mmd_root.group_morphs:
             if len(m.data) != len(set(m.data.keys())):
-                print(' * Found duplicated morph data in Group Morph "%s"'%m.name)
+                logging.warning(' * Found duplicated morph data in Group Morph "%s"', m.name)
             morph_name = m.name.replace('"', '\\"')
             morph_path = 'data.shape_keys.key_blocks["%s"].value'%morph_name
             for d in m.data:
@@ -577,9 +668,13 @@ class _MorphSlider:
                 driver.expression = '%s'%__config_groups(variables, var.name, groups)
 
         for mat in (m for m in rig.materials() if m and m.use_nodes and not m.name.startswith('mmd_')):
-            mat_id = mat.mmd_material.material_id
-            mul_all, add_all = material_offset_map.get(-1, ([], []))
-            mul_list, add_list = material_offset_map.get('' if mat_id < 0 else mat_id, ([], []))
+            mul_all, add_all = material_offset_map.get('#', ([], []))
+            if mat.name == '':
+                logging.warning('Oh no. The material name should never empty.')
+                mul_list, add_list = [], []
+            else:
+                mat_name = '#'+mat.name
+                mul_list, add_list = material_offset_map.get(mat_name, ([], []))
             morph_list = tuple(mul_all+mul_list+add_all+add_list)
             __config_material_morph(mat, morph_list)
             mat_edge = bpy.data.materials.get('mmd_edge.'+mat.name, None)
@@ -588,3 +683,87 @@ class _MorphSlider:
 
         morph_sliders[0].mute = False
 
+
+class MigrationFnMorph:
+    @staticmethod
+    def update_mmd_morph():
+        from mmd_tools.core.material import FnMaterial
+
+        for root in bpy.data.objects:
+            if root.mmd_type != 'ROOT':
+                continue
+
+            for mat_morph in root.mmd_root.material_morphs:
+                for morph_data in mat_morph.data:
+
+                    if morph_data.material_data is not None:
+
+                        # The material_id is also no longer used, but for compatibility with older version mmd_tools, keep it.
+                        if 'material_id' not in morph_data.material_data.mmd_material or\
+                            'material_id' not in morph_data or\
+                            morph_data.material_data.mmd_material['material_id'] == morph_data['material_id']:
+
+                            # In the new version, the related_mesh property is no longer used.
+                            # Explicitly remove this property to avoid misuse.
+                            if 'related_mesh' in morph_data:
+                                del morph_data['related_mesh']
+                            continue
+
+                        else:
+                            # Compat case. The new version mmd_tools saved. And old version mmd_tools edit. Then new version mmd_tools load again.
+                            # Go update path.
+                            pass
+                    
+                    morph_data.material_data = None
+                    if 'material_id' in morph_data:
+                        mat_id = morph_data['material_id']
+                        if mat_id != -1:
+                            fnMat = FnMaterial.from_material_id(mat_id)
+                            if fnMat:
+                                morph_data.material_data = fnMat.material
+                            else:
+                                morph_data['material_id'] = -1
+                    
+                    morph_data.related_mesh_data = None
+                    if 'related_mesh' in morph_data:
+                        related_mesh = morph_data['related_mesh']
+                        del morph_data['related_mesh']
+                        if related_mesh != '' and related_mesh in bpy.data.meshes:
+                            morph_data.related_mesh_data = bpy.data.meshes[related_mesh]
+
+    @staticmethod
+    def ensure_material_id_not_conflict():
+        mat_ids_set = set()
+
+        # The reference library properties cannot be modified and bypassed in advance.
+        need_update_mat = []
+        for mat in bpy.data.materials:
+            if mat.mmd_material.material_id < 0:
+                continue
+            if mat.library is not None:
+                mat_ids_set.add(mat.mmd_material.material_id)
+            else:
+                need_update_mat.append(mat)
+
+        for mat in need_update_mat:
+            if mat.mmd_material.material_id in mat_ids_set:
+                mat.mmd_material.material_id = max(mat_ids_set) + 1
+            mat_ids_set.add(mat.mmd_material.material_id)
+
+    @staticmethod
+    def compatible_with_old_version_mmd_tools():
+        MigrationFnMorph.ensure_material_id_not_conflict()
+
+        for root in bpy.data.objects:
+            if root.mmd_type != 'ROOT':
+                continue
+
+            for mat_morph in root.mmd_root.material_morphs:
+                for morph_data in mat_morph.data:
+
+                    morph_data['related_mesh'] = morph_data.related_mesh
+
+                    if morph_data.material_data is None:
+                        morph_data.material_id = -1
+                    else:
+                        morph_data.material_id = morph_data.material_data.mmd_material.material_id

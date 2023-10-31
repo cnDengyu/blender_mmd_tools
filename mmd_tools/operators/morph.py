@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import bpy
+import mmd_tools.core.model as mmd_model
 from bpy.types import Operator
-from mathutils import Vector, Quaternion
-
-from mmd_tools import register_wrap
-from mmd_tools import bpyutils
-from mmd_tools import utils
-from mmd_tools.utils import ItemOp, ItemMoveOp
+from mathutils import Quaternion, Vector
+from mmd_tools import bpyutils, utils
+from mmd_tools.core.exceptions import DivisionError, MaterialNotFoundError
 from mmd_tools.core.material import FnMaterial
 from mmd_tools.core.morph import FnMorph
-from mmd_tools.core.exceptions import MaterialNotFoundError, DivisionError
-import mmd_tools.core.model as mmd_model
+from mmd_tools.utils import ItemMoveOp, ItemOp
+
 
 #Util functions
 def divide_vector_components(vec1, vec2):
@@ -46,7 +44,6 @@ def special_division(n1, n2):
     return n1/n2
 
 
-@register_wrap
 class AddMorph(Operator):
     bl_idname = 'mmd_tools.morph_add'
     bl_label = 'Add Morph'
@@ -65,14 +62,14 @@ class AddMorph(Operator):
             morph.data_type = 'VERTEX_GROUP'
         return {'FINISHED'}
 
-@register_wrap
+
 class RemoveMorph(Operator):
     bl_idname = 'mmd_tools.morph_remove'
     bl_label = 'Remove Morph'
     bl_description = 'Remove morph item(s) from the list'
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
-    all = bpy.props.BoolProperty(
+    all: bpy.props.BoolProperty(
         name='All',
         description='Delete all morph items',
         default=False,
@@ -99,7 +96,6 @@ class RemoveMorph(Operator):
             mmd_root.active_morph = max(0, mmd_root.active_morph-1)
         return {'FINISHED'}
 
-@register_wrap
 class MoveMorph(Operator, ItemMoveOp):
     bl_idname = 'mmd_tools.morph_move'
     bl_label = 'Move Morph'
@@ -117,7 +113,6 @@ class MoveMorph(Operator, ItemMoveOp):
             )
         return {'FINISHED'}
 
-@register_wrap
 class CopyMorph(Operator):
     bl_idname = 'mmd_tools.morph_copy'
     bl_label = 'Copy Morph'
@@ -152,7 +147,27 @@ class CopyMorph(Operator):
         morph_new.name = name_orig + '_copy' # trigger name check
         return {'FINISHED'}
 
-@register_wrap
+
+class OverwriteBoneMorphsFromPoseLibrary(Operator):
+    bl_idname = 'mmd_tools.morph_overwrite_from_active_pose_library'
+    bl_label = 'Overwrite Bone Morphs from active Pose Library'
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    @classmethod
+    def poll(cls, context):
+        root = mmd_model.Model.findRoot(context.active_object)
+        if root is None:
+            return False
+
+        return root.mmd_root.active_morph_type == 'bone_morphs'
+
+    def execute(self, context):
+        root = mmd_model.Model.findRoot(context.active_object)
+        FnMorph.overwrite_bone_morphs_from_pose_library(mmd_model.FnModel.find_armature(root))
+
+        return {'FINISHED'}
+
+
 class AddMorphOffset(Operator):
     bl_idname = 'mmd_tools.morph_offset_add'
     bl_label = 'Add Morph Offset'
@@ -186,14 +201,13 @@ class AddMorphOffset(Operator):
 
         return { 'FINISHED' }
 
-@register_wrap
 class RemoveMorphOffset(Operator):
     bl_idname = 'mmd_tools.morph_offset_remove'
     bl_label = 'Remove Morph Offset'
     bl_description = 'Remove morph offset item(s) from the list'
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
-    all = bpy.props.BoolProperty(
+    all: bpy.props.BoolProperty(
         name='All',
         description='Delete all morph offset items',
         default=False,
@@ -229,14 +243,13 @@ class RemoveMorphOffset(Operator):
             morph.active_data = max(0, morph.active_data-1)
         return { 'FINISHED' }
 
-@register_wrap
 class InitMaterialOffset(Operator):
     bl_idname = 'mmd_tools.material_morph_offset_init'
     bl_label = 'Init Material Offset'
     bl_description = 'Set all offset values to target value'
     bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
 
-    target_value = bpy.props.FloatProperty(
+    target_value: bpy.props.FloatProperty(
         name='Target Value',
         description='Target value',
         default=0,
@@ -257,7 +270,6 @@ class InitMaterialOffset(Operator):
         mat_data.texture_factor = mat_data.toon_texture_factor = mat_data.sphere_texture_factor = (val,)*4
         return {'FINISHED'}
 
-@register_wrap
 class ApplyMaterialOffset(Operator):
     bl_idname = 'mmd_tools.apply_material_morph_offset'
     bl_label = 'Apply Material Offset'
@@ -320,7 +332,6 @@ class ApplyMaterialOffset(Operator):
         FnMaterial.clean_materials(meshObj, can_remove=lambda m: m == work_mat)
         return { 'FINISHED' }
 
-@register_wrap
 class CreateWorkMaterial(Operator):
     bl_idname = 'mmd_tools.create_work_material'
     bl_label = 'Create Work Material'
@@ -386,7 +397,6 @@ class CreateWorkMaterial(Operator):
 
         return { 'FINISHED' }
 
-@register_wrap
 class ClearTempMaterials(Operator):
     bl_idname = 'mmd_tools.clear_temp_materials'
     bl_label = 'Clear Temp Materials'
@@ -410,7 +420,6 @@ class ClearTempMaterials(Operator):
             FnMaterial.clean_materials(meshObj, can_remove=__pre_remove)
         return { 'FINISHED' }
 
-@register_wrap
 class ViewBoneMorph(Operator):
     bl_idname = 'mmd_tools.view_bone_morph'
     bl_label = 'View Bone Morph'
@@ -435,7 +444,6 @@ class ViewBoneMorph(Operator):
                 p_bone.matrix_basis = mtx
         return { 'FINISHED' }
 
-@register_wrap
 class ClearBoneMorphView(Operator):
     bl_idname = 'mmd_tools.clear_bone_morph_view'
     bl_label = 'Clear Bone Morph View'
@@ -451,7 +459,6 @@ class ClearBoneMorphView(Operator):
             p_bone.matrix_basis.identity()
         return { 'FINISHED' }
 
-@register_wrap
 class ApplyBoneMorph(Operator):
     bl_idname = 'mmd_tools.apply_bone_morph'
     bl_label = 'Apply Bone Morph'
@@ -478,7 +485,6 @@ class ApplyBoneMorph(Operator):
                 p_bone.bone.select = False
         return { 'FINISHED' }
 
-@register_wrap
 class SelectRelatedBone(Operator):
     bl_idname = 'mmd_tools.select_bone_morph_offset_bone'
     bl_label = 'Select Related Bone'
@@ -496,7 +502,6 @@ class SelectRelatedBone(Operator):
         utils.selectSingleBone(context, armature, morph_data.bone)
         return { 'FINISHED' }
 
-@register_wrap
 class EditBoneOffset(Operator): 
     bl_idname = 'mmd_tools.edit_bone_morph_offset'
     bl_label = 'Edit Related Bone'
@@ -518,7 +523,6 @@ class EditBoneOffset(Operator):
         utils.selectSingleBone(context, armature, p_bone.name)
         return { 'FINISHED' }
 
-@register_wrap
 class ApplyBoneOffset(Operator):
     bl_idname = 'mmd_tools.apply_bone_morph_offset'
     bl_label = 'Apply Bone Morph Offset'
@@ -538,7 +542,6 @@ class ApplyBoneOffset(Operator):
         morph_data.rotation = p_bone.rotation_quaternion if p_bone.rotation_mode == 'QUATERNION' else p_bone.matrix_basis.to_quaternion()
         return { 'FINISHED' }
 
-@register_wrap
 class ViewUVMorph(Operator):
     bl_idname = 'mmd_tools.view_uv_morph'
     bl_label = 'View UV Morph'
@@ -598,7 +601,6 @@ class ViewUVMorph(Operator):
         meshObj.select = selected
         return { 'FINISHED' }
 
-@register_wrap
 class ClearUVMorphView(Operator):
     bl_idname = 'mmd_tools.clear_uv_morph_view'
     bl_label = 'Clear UV Morph View'
@@ -635,7 +637,6 @@ class ClearUVMorphView(Operator):
                 bpy.data.actions.remove(act)
         return { 'FINISHED' }
 
-@register_wrap
 class EditUVMorph(Operator):
     bl_idname = 'mmd_tools.edit_uv_morph'
     bl_label = 'Edit UV Morph'
@@ -678,7 +679,6 @@ class EditUVMorph(Operator):
         meshObj.select = selected
         return { 'FINISHED' }
 
-@register_wrap
 class ApplyUVMorph(Operator):
     bl_idname = 'mmd_tools.apply_uv_morph'
     bl_label = 'Apply UV Morph'
@@ -730,3 +730,19 @@ class ApplyUVMorph(Operator):
         meshObj.select = selected
         return { 'FINISHED' }
 
+
+class CleanDuplicatedMaterialMorphs(bpy.types.Operator):
+    bl_idname = 'mmd_tools.clean_duplicated_material_morphs'
+    bl_label = 'Clean Duplicated Material Morphs'
+    bl_description = 'Clean duplicated material morphs'
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return mmd_model.Model.findRoot(context.active_object) is not None
+
+    def execute(self, context: bpy.types.Context):
+        mmd_root_object = mmd_model.FnModel.find_root(context.active_object)
+        FnMorph.clean_duplicated_material_morphs(mmd_root_object)
+
+        return { 'FINISHED' }

@@ -1,25 +1,22 @@
 # -*- coding: utf-8 -*-
 
-import bpy
 import math
-import mathutils
+from typing import Dict
 
-from bpy.types import Operator
-
-from mmd_tools import register_wrap
-from mmd_tools import utils
-from mmd_tools.bpyutils import Props
-from mmd_tools.core import rigid_body
+import bpy
 import mmd_tools.core.model as mmd_model
+from mmd_tools import utils
+from mmd_tools.bpyutils import Props, activate_layer_collection
+from mmd_tools.core import rigid_body
 
-@register_wrap
-class SelectRigidBody(Operator):
+
+class SelectRigidBody(bpy.types.Operator):
     bl_idname = 'mmd_tools.rigid_body_select'
     bl_label = 'Select Rigid Body'
     bl_description = 'Select similar rigidbody objects which have the same property values with active rigidbody object'
     bl_options = {'REGISTER', 'UNDO'}
 
-    properties = bpy.props.EnumProperty(
+    properties: bpy.props.EnumProperty(
         name='Properties',
         description='Select the properties to be compared',
         options={'ENUM_FLAG'},
@@ -32,7 +29,7 @@ class SelectRigidBody(Operator):
             ],
         default=set(),
         )
-    hide_others = bpy.props.BoolProperty(
+    hide_others: bpy.props.BoolProperty(
         name='Hide Others',
         description='Hide the rigidbody object which does not have the same property values with active rigidbody object',
         default=False,
@@ -80,36 +77,35 @@ class SelectRigidBody(Operator):
 
         return { 'FINISHED' }
 
-@register_wrap
-class AddRigidBody(Operator):
+class AddRigidBody(bpy.types.Operator):
     bl_idname = 'mmd_tools.rigid_body_add'
     bl_label = 'Add Rigid Body'
     bl_description = 'Add Rigid Bodies to selected bones'
     bl_options = {'REGISTER', 'UNDO', 'PRESET', 'INTERNAL'}
 
-    name_j = bpy.props.StringProperty(
+    name_j: bpy.props.StringProperty(
         name='Name',
         description='The name of rigid body ($name_j means use the japanese name of target bone)',
         default='$name_j',
         )
-    name_e = bpy.props.StringProperty(
+    name_e: bpy.props.StringProperty(
         name='Name(Eng)',
         description='The english name of rigid body ($name_e means use the english name of target bone)',
         default='$name_e',
         )
-    collision_group_number = bpy.props.IntProperty(
+    collision_group_number: bpy.props.IntProperty(
         name='Collision Group',
         description='The collision group of the object',
         min=0,
         max=15,
         )
-    collision_group_mask = bpy.props.BoolVectorProperty(
+    collision_group_mask: bpy.props.BoolVectorProperty(
         name='Collision Group Mask',
         description='The groups the object can not collide with',
         size=16,
         subtype='LAYER',
         )
-    rigid_type = bpy.props.EnumProperty(
+    rigid_type: bpy.props.EnumProperty(
         name='Rigid Type',
         description='Select rigid type',
         items = [
@@ -121,7 +117,7 @@ class AddRigidBody(Operator):
                 "Bone determined by combination of parent and attached rigid body", 3),
             ],
         )
-    rigid_shape = bpy.props.EnumProperty(
+    rigid_shape: bpy.props.EnumProperty(
         name='Shape',
         description='Select the collision shape',
         items = [
@@ -130,7 +126,7 @@ class AddRigidBody(Operator):
             ('CAPSULE', 'Capsule', '', 3),
             ],
         )
-    size = bpy.props.FloatVectorProperty(
+    size: bpy.props.FloatVectorProperty(
         name='Size',
         description='Size of the object, the values will multiply the length of target bone',
         subtype='XYZ',
@@ -138,33 +134,33 @@ class AddRigidBody(Operator):
         min=0,
         default=[0.6, 0.6, 0.6],
         )
-    mass = bpy.props.FloatProperty(
+    mass: bpy.props.FloatProperty(
         name='Mass',
         description="How much the object 'weights' irrespective of gravity",
         min=0.001,
         default=1,
         )
-    friction = bpy.props.FloatProperty(
+    friction: bpy.props.FloatProperty(
         name='Friction',
         description='Resistance of object to movement',
         min=0,
         soft_max=1,
         default=0.5,
         )
-    bounce = bpy.props.FloatProperty(
+    bounce: bpy.props.FloatProperty(
         name='Restitution',
         description='Tendency of object to bounce after colliding with another (0 = stays still, 1 = perfectly elastic)',
         min=0,
         soft_max=1,
         )
-    linear_damping = bpy.props.FloatProperty(
+    linear_damping: bpy.props.FloatProperty(
         name='Linear Damping',
         description='Amount of linear velocity that is lost over time',
         min=0,
         max=1,
         default=0.04,
         )
-    angular_damping = bpy.props.FloatProperty(
+    angular_damping: bpy.props.FloatProperty(
         name='Angular Damping',
         description='Amount of angular velocity that is lost over time',
         min=0,
@@ -266,8 +262,7 @@ class AddRigidBody(Operator):
         vm = context.window_manager
         return vm.invoke_props_dialog(self)
 
-@register_wrap
-class RemoveRigidBody(Operator):
+class RemoveRigidBody(bpy.types.Operator):
     bl_idname = 'mmd_tools.rigid_body_remove'
     bl_label = 'Remove Rigid Body'
     bl_description = 'Deletes the currently selected Rigid Body'
@@ -286,31 +281,60 @@ class RemoveRigidBody(Operator):
             utils.selectAObject(root)
         return { 'FINISHED' } 
 
-@register_wrap
-class AddJoint(Operator): 
+class RigidBodyBake(bpy.types.Operator):
+    bl_idname = 'mmd_tools.ptcache_rigid_body_bake'
+    bl_label = 'Bake'
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    def execute(self, context: bpy.types.Context):
+        override: Dict = context.copy()
+        override.update({
+            'scene': context.scene,
+            'point_cache': context.scene.rigidbody_world.point_cache
+        })
+        bpy.ops.ptcache.bake(override, 'INVOKE_DEFAULT',  bake=True)
+
+        return {'FINISHED'}
+
+class RigidBodyDeleteBake(bpy.types.Operator):
+    bl_idname = 'mmd_tools.ptcache_rigid_body_delete_bake'
+    bl_label = 'Delete Bake'
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    def execute(self, context: bpy.types.Context):
+        override: Dict = context.copy()
+        override.update({
+            'scene': context.scene,
+            'point_cache': context.scene.rigidbody_world.point_cache
+        })
+        bpy.ops.ptcache.free_bake(override, 'INVOKE_DEFAULT')
+
+        return {'FINISHED'}
+
+class AddJoint(bpy.types.Operator): 
     bl_idname = 'mmd_tools.joint_add'
     bl_label = 'Add Joint'
     bl_description = 'Add Joint(s) to selected rigidbody objects'
     bl_options = {'REGISTER', 'UNDO', 'PRESET', 'INTERNAL'}
 
-    use_bone_rotation = bpy.props.BoolProperty(
+    use_bone_rotation: bpy.props.BoolProperty(
         name='Use Bone Rotation',
         description='Match joint orientation to bone orientation if enabled',
         default=True,
         )
-    limit_linear_lower = bpy.props.FloatVectorProperty(
+    limit_linear_lower: bpy.props.FloatVectorProperty(
         name='Limit Linear Lower',
         description='Lower limit of translation',
         subtype='XYZ',
         size=3,
         )
-    limit_linear_upper = bpy.props.FloatVectorProperty(
+    limit_linear_upper: bpy.props.FloatVectorProperty(
         name='Limit Linear Upper',
         description='Upper limit of translation',
         subtype='XYZ',
         size=3,
         )
-    limit_angular_lower = bpy.props.FloatVectorProperty(
+    limit_angular_lower: bpy.props.FloatVectorProperty(
         name='Limit Angular Lower',
         description='Lower limit of rotation',
         subtype='EULER',
@@ -319,7 +343,7 @@ class AddJoint(Operator):
         max=math.pi*2,
         default=[-math.pi/4]*3,
         )
-    limit_angular_upper = bpy.props.FloatVectorProperty(
+    limit_angular_upper: bpy.props.FloatVectorProperty(
         name='Limit Angular Upper',
         description='Upper limit of rotation',
         subtype='EULER',
@@ -328,14 +352,14 @@ class AddJoint(Operator):
         max=math.pi*2,
         default=[math.pi/4]*3,
         )
-    spring_linear = bpy.props.FloatVectorProperty(
+    spring_linear: bpy.props.FloatVectorProperty(
         name='Spring(Linear)',
         description='Spring constant of movement',
         subtype='XYZ',
         size=3,
         min=0,
         )
-    spring_angular = bpy.props.FloatVectorProperty(
+    spring_angular: bpy.props.FloatVectorProperty(
         name='Spring(Angular)',
         description='Spring constant of rotation',
         subtype='XYZ',
@@ -420,8 +444,7 @@ class AddJoint(Operator):
         vm = context.window_manager
         return vm.invoke_props_dialog(self)
 
-@register_wrap
-class RemoveJoint(Operator):
+class RemoveJoint(bpy.types.Operator):
     bl_idname = 'mmd_tools.joint_remove'
     bl_label = 'Remove Joint'
     bl_description = 'Deletes the currently selected Joint'
@@ -440,8 +463,7 @@ class RemoveJoint(Operator):
             utils.selectAObject(root)
         return { 'FINISHED' }
 
-@register_wrap
-class UpdateRigidBodyWorld(Operator):
+class UpdateRigidBodyWorld(bpy.types.Operator):
     bl_idname = 'mmd_tools.rigid_body_world_update'
     bl_label = 'Update Rigid Body World'
     bl_description = 'Update rigid body world and references of rigid body constraint according to current scene objects (experimental)'
@@ -451,15 +473,6 @@ class UpdateRigidBodyWorld(Operator):
     def __get_rigid_body_world_objects():
         rigid_body.setRigidBodyWorldEnabled(True)
         rbw = bpy.context.scene.rigidbody_world
-        if bpy.app.version < (2, 80, 0):
-            if not rbw.group:
-                rbw.group = bpy.data.groups.new('RigidBodyWorld')
-                rbw.group.use_fake_user = True
-            if not rbw.constraints:
-                rbw.constraints = bpy.data.groups.new('RigidBodyConstraints')
-                rbw.constraints.use_fake_user = True
-            return rbw.group.objects, rbw.constraints.objects
-
         if not rbw.collection:
             rbw.collection = bpy.data.collections.new('RigidBodyWorld')
             rbw.collection.use_fake_user = True
@@ -469,16 +482,17 @@ class UpdateRigidBodyWorld(Operator):
 
         if hasattr(bpy.context.scene.rigidbody_world, 'substeps_per_frame'):
             bpy.context.scene.rigidbody_world.substeps_per_frame = 1
+            bpy.context.scene.rigidbody_world.solver_iterations = 60
 
         return rbw.collection.objects, rbw.constraints.objects
 
     def execute(self, context):
-        scene_objs = (bpy.context.scene.objects,)
-        scene_objs += tuple({x.dupli_group.objects for x in scene_objs[0] if x.dupli_type == 'GROUP' and x.dupli_group}) if bpy.app.version < (2, 80, 0)\
-            else tuple({x.instance_collection.objects for x in scene_objs[0] if x.instance_type == 'COLLECTION' and x.instance_collection})
+        scene = context.scene
+        scene_objs = set(scene.objects)
+        scene_objs.union(o for x in scene.objects if x.instance_type == 'COLLECTION' and x.instance_collection for o in x.instance_collection.objects)
 
         def _update_group(obj, group):
-            if any((obj in x.values()) for x in scene_objs):
+            if obj in scene_objs:
                 if obj not in group.values():
                     group.link(obj)
                 return True
@@ -488,30 +502,54 @@ class UpdateRigidBodyWorld(Operator):
 
         def _references(obj):
             yield obj
-            if obj.proxy:
+            if getattr(obj, 'proxy', None):
                 yield from _references(obj.proxy)
             if getattr(obj, 'override_library', None):
                 yield from _references(obj.override_library.reference)
 
-        _find_root = mmd_model.Model.findRoot
+        _find_root = mmd_model.FnModel.find_root
+        need_rebuild_physics = scene.rigidbody_world is None or scene.rigidbody_world.collection is None or scene.rigidbody_world.constraints is None
         rb_objs, rbc_objs = self.__get_rigid_body_world_objects()
         objects = bpy.data.objects
         table = {}
 
-        for i in (x for x in objects if x.rigid_body):
-            if _update_group(i, rb_objs):
-                rb_map = table.setdefault(_find_root(i), {})
-                if i in rb_map: # means rb_map[i] will replace i
-                    rb_objs.unlink(i)
-                    continue
-                for r in _references(i):
-                    rb_map[r] = i
+        # Perhaps due to a bug in Blender,
+        # when bpy.ops.rigidbody.world_remove(),
+        # Object.rigid_body are removed,
+        # but Object.rigid_body_constraint are retained.
+        # Therefore, it must be checked with Object.mmd_type.
+        for i in (x for x in objects if x.mmd_type == 'RIGID_BODY'):
+            if not _update_group(i, rb_objs):
+                continue
+
+            rb_map = table.setdefault(_find_root(i), {})
+            if i in rb_map: # means rb_map[i] will replace i
+                rb_objs.unlink(i)
+                continue
+            for r in _references(i):
+                rb_map[r] = i
+
+            # TODO Modify mmd_rigid to allow recovery of the remaining rigidbody parameters.
+            # mass, friction, restitution, linear_dumping, angular_dumping
 
         for i in (x for x in objects if x.rigid_body_constraint):
-            if _update_group(i, rbc_objs):
-                rbc, root = i.rigid_body_constraint, _find_root(i)
-                rb_map = table.get(root, {})
-                rbc.object1 = rb_map.get(rbc.object1, rbc.object1)
-                rbc.object2 = rb_map.get(rbc.object2, rbc.object2)
+            if not _update_group(i, rbc_objs):
+                continue
+
+            rbc, root = i.rigid_body_constraint, _find_root(i)
+            rb_map = table.get(root, {})
+            rbc.object1 = rb_map.get(rbc.object1, rbc.object1)
+            rbc.object2 = rb_map.get(rbc.object2, rbc.object2)
+
+        if need_rebuild_physics:
+            for root in scene.objects:
+                if root.mmd_type != 'ROOT':
+                    continue
+                if not root.mmd_root.is_built:
+                    continue
+                with activate_layer_collection(root):
+                    mmd_model.Model(root).build()
+                    # After rebuild. First play. Will be crash!
+                    # But saved it before. Reload after crash. The play can be work.
 
         return { 'FINISHED' }
