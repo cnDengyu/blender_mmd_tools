@@ -2,6 +2,7 @@
 import os
 import copy
 import logging
+import math
 import shutil
 import time
 
@@ -14,6 +15,7 @@ from mmd_tools.core import pmx
 from mmd_tools.core.bone import FnBone
 from mmd_tools.core.material import FnMaterial
 from mmd_tools.core.morph import FnMorph
+from mmd_tools.core.translations import FnTranslations
 from mmd_tools.core.sdef import FnSDEF
 from mmd_tools.core.vmd.importer import BoneConverter, BoneConverterPoseMode
 from mmd_tools import bpyutils
@@ -80,6 +82,8 @@ class __PmxExporter:
         self.__exported_vertices = []
         self.__default_material = None
         self.__vertex_order_map = None # used for controlling vertex order
+        self.__overwrite_bone_morphs_from_pose_library = False
+        self.__translate_in_presets = False
         self.__disable_specular = False
         self.__add_uv_count = 0
 
@@ -313,7 +317,7 @@ class __PmxExporter:
         else:
             return cls.__countBoneDepth(bone.parent) + 1
 
-    def __exportBones(self, meshes):
+    def __exportBones(self, root, meshes):
         """ Export bones.
         Returns:
             A dictionary to map Blender bone names to bone indices of the pmx.model instance.
@@ -378,14 +382,31 @@ class __PmxExporter:
                 boneMap[bone] = pmx_bone
                 r[bone.name] = len(pmx_bones) - 1
 
-                if bone.use_connect and p_bone.parent.mmd_bone.is_tip:
-                    logging.debug(' * fix location of bone %s, parent %s is tip', bone.name, bone.parent.name)
-                    pmx_bone.location = boneMap[bone.parent].location
+                if (
+                    pmx_bone.parent is not None
+                    and (
+                        bone.use_connect
+                        or (
+                            not pmx_bone.isMovable
+                            and math.isclose(0.0, (bone.head - pmx_bone.parent.tail).length)
+                        )
+                    )
+                    and p_bone.parent.mmd_bone.is_tip
+                ):
+                    logging.debug(' * fix location of bone %s, parent %s is tip', bone.name, pmx_bone.parent.name)
+                    pmx_bone.location = boneMap[pmx_bone.parent].location
 
                 # a connected child bone is preferred
                 pmx_bone.displayConnection = None
                 for child in bone.children:
-                    if child.use_connect:
+                    if (
+                        child.use_connect
+                        or bool(child.get('mmd_bone_use_connect'))
+                        or (
+                            all(pose_bones[child.name].lock_location)
+                            and math.isclose(0.0, (child.head - bone.tail).length)
+                        )
+                    ):
                         pmx_bone.displayConnection = child
                         break
                 if not pmx_bone.displayConnection:
@@ -424,7 +445,7 @@ class __PmxExporter:
                 pmx_bones.append(pmx_bone)
 
             self.__model.bones = pmx_bones
-        self.__exportIK(r)
+        self.__exportIK(root, r)
         return r
 
     def __exportIKLinks(self, pose_bone, count, bone_map, ik_links, custom_bone):
@@ -470,13 +491,13 @@ class __PmxExporter:
         return self.__exportIKLinks(pose_bone.parent, count - 1, bone_map, ik_links + [ik_link], custom_bone)
 
 
-    def __exportIK(self, bone_map):
+    def __exportIK(self, root, bone_map):
         """ Export IK constraints
          @param bone_map the dictionary to map Blender bone names to bone indices of the pmx.model instance.
         """
         pmx_bones = self.__model.bones
         arm = self.__armature
-        ik_loop_factor = max(arm.get('mmd_ik_loop_factor', 1), 1)
+        ik_loop_factor = root.mmd_root.ik_loop_factor
         pose_bones = arm.pose.bones
 
         ik_target_custom_map = {getattr(b.constraints.get('mmd_ik_target_custom', None), 'subtarget', None):b for b in pose_bones if not b.is_mmd_shadow_bone}
@@ -667,6 +688,9 @@ class __PmxExporter:
         self.__model.faces = sorted_faces
 
     def __export_bone_morphs(self, root):
+        if self.__overwrite_bone_morphs_from_pose_library:
+            FnMorph.overwrite_bone_morphs_from_pose_library(self.__armature)
+
         mmd_root = root.mmd_root
         if len(mmd_root.bone_morphs) == 0:
             return
@@ -1219,6 +1243,13 @@ class __PmxExporter:
             for m, show in muted_modifiers:
                 m.show_viewport = show
 
+    def __translate_armature(self, root_object: bpy.types.Object):
+        FnTranslations.clear_data(root_object.mmd_root.translation)
+        FnTranslations.collect_data(root_object.mmd_root.translation)
+        FnTranslations.update_query(root_object.mmd_root.translation)
+        FnTranslations.execute_translation_batch(root_object)
+        FnTranslations.apply_translations(root_object)
+        FnTranslations.clear_data(root_object.mmd_root.translation)
 
     def execute(self, filepath, **args):
         root = args.get('root', None)
@@ -1249,7 +1280,13 @@ class __PmxExporter:
         if sort_vertices != 'NONE':
             self.__vertex_order_map = {'method':sort_vertices}
 
-        nameMap = self.__exportBones(meshes)
+        self.__overwrite_bone_morphs_from_pose_library = args.get('overwrite_bone_morphs_from_pose_library', False)
+        self.__translate_in_presets = args.get('translate_in_presets', False)
+
+        if self.__translate_in_presets:
+            self.__translate_armature(root)
+
+        nameMap = self.__exportBones(root, meshes)
 
         mesh_data = [self.__loadMeshData(i, nameMap) for i in meshes]
         self.__exportMeshes(mesh_data, nameMap)

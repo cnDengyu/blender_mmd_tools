@@ -1,6 +1,15 @@
 変更履歴
 ========
 
+See the following URL for a recent changelog.
+* https://github.com/UuuNyaa/blender_mmd_tools/releases
+
+最近の変更履歴は以下のURLを参照してください。
+* https://github.com/UuuNyaa/blender_mmd_tools/releases
+
+
+
+
 v0.4.5
 ------
 ### 機能追加 ###

@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
-import bpy
-from mathutils import Vector, Matrix, Quaternion
+import logging
 import time
 
+import bpy
+from mathutils import Matrix, Quaternion, Vector
 from mmd_tools.bpyutils import matmul
 
 
@@ -245,7 +246,7 @@ class FnSDEF():
             cls.driver_function(shapkey, obj.name, bulk_update=True, use_skip=False, use_scale=use_scale)
         bulk_time = time.time() - t
         result = default_time > bulk_time
-        print('FnSDEF:benchmark: default %.4f vs bulk_update %.4f => bulk_update=%s' % (default_time, bulk_time, result))
+        logging.info('FnSDEF:benchmark: default %.4f vs bulk_update %.4f => bulk_update=%s', default_time, bulk_time, result)
         return result
 
     @classmethod
